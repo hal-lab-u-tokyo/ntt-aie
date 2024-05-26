@@ -27,7 +27,8 @@ if (NOT WSL)
 else()
     set(BOOST_ROOT C:/Technical/thirdParty/boost_1_83_0 CACHE STRING "Path to Boost install")
     set(XRT_INC_DIR C:/Technical/XRT/src/runtime_src/core/include CACHE STRING "Path to XRT cloned repo")
-    set(XRT_LIB_DIR C:/Technical/xrtNPUfromDLL CACHE STRING "Path to xrt_coreutil.lib")
+    set(XRT_LIB_DIR C:/Technical/xrtIPUfromDLL CACHE STRING "Path to xrt_coreutil.lib")
+    set(MLIR_AIE_DIR C:/Technical/mlir-aie CACHE STRING "Path to mlir-aie")
 endif()
 
 set(TARGET_NAME test CACHE STRING "Target to be built")
@@ -45,7 +46,7 @@ project(${ProjectName})
 find_package(Boost REQUIRED)
 
 add_executable(${currentTarget}
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../runtime_lib/test_lib/test_utils.cpp
+    ${MLIR_AIE_DIR}/runtime_lib/test_lib/test_utils.cpp
     test.cpp
 )
 
@@ -54,7 +55,7 @@ target_compile_definitions(${currentTarget} PUBLIC DISABLE_ABI_CHECK=1)
 target_include_directories (${currentTarget} PUBLIC 
     ${XRT_INC_DIR}
     ${Boost_INCLUDE_DIRS}
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../runtime_lib/test_lib
+    ${MLIR_AIE_DIR}/runtime_lib/test_lib
 )
 
 target_link_directories(${currentTarget} PUBLIC
