@@ -53,6 +53,9 @@ vck5000: build/aie.mlir
 		-Wl,-R/opt/xaiengine/lib \
 		-Wl,--whole-archive -Wl,--no-whole-archive -lstdc++ -ldl -lelf -o test.elf
 
+host: ntt_on_cpu.cc
+	g++ -o host $<
+
 run: ${targetname}.exe build/final.xclbin build/insts.txt 
 	${powershell} ./$< -x build/final.xclbin -i build/insts.txt -k MLIR_AIE
 
