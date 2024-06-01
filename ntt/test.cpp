@@ -112,26 +112,21 @@ int main(int argc, const char *argv[]) {
 
   uint32_t *bufInA = bo_inA.map<uint32_t *>();
   std::vector<uint32_t> srcVecA;
-  for (int i = 0; i < IN_SIZE; i++)
-    srcVecA.push_back(i + 1);
+  for (int i = 0; i < IN_SIZE; i++) {
+    srcVecA.push_back(i);
+  }
   memcpy(bufInA, srcVecA.data(), (srcVecA.size() * sizeof(uint32_t)));
-
-  uint32_t *bufInB = bo_inB.map<uint32_t *>();
-  std::vector<uint32_t> srcVecB;
-  for (int i = 0; i < IN_SIZE; i++)
-    srcVecB.push_back(i);
-  memcpy(bufInB, srcVecB.data(), (srcVecB.size() * sizeof(uint32_t)));
-
+  
   void *bufInstr = bo_instr.map<void *>();
   memcpy(bufInstr, instr_v.data(), instr_v.size() * sizeof(int));
 
   bo_instr.sync(XCL_BO_SYNC_BO_TO_DEVICE);
   bo_inA.sync(XCL_BO_SYNC_BO_TO_DEVICE);
-  bo_inB.sync(XCL_BO_SYNC_BO_TO_DEVICE);
-
+  
+  // Call Kernel
   if (verbosity >= 1)
     std::cout << "Running Kernel.\n";
-  auto run = kernel(bo_instr, instr_v.size(), bo_inA, bo_inB, bo_out);
+  auto run = kernel(bo_instr, instr_v.size(), bo_inA, bo_out);
   run.wait();
 
   bo_out.sync(XCL_BO_SYNC_BO_FROM_DEVICE);
@@ -141,16 +136,21 @@ int main(int argc, const char *argv[]) {
   int errors = 0;
 
   for (uint32_t i = 0; i < OUT_SIZE; i++) {
-    if (*(bufOut + i) != *(bufInA + i) + *(bufInB + i)) {
+    if (*(bufOut + i) != *(bufInA + i) + *(bufInA + i)) {
       std::cout << "Error in output " << *(bufOut + i)
-                << " != " << *(bufInA + i) << " + " << *(bufInB + i)
+                << " != " << *(bufInA + i) << " + " << *(bufInA + i)
                 << std::endl;
       errors++;
     } else {
       if (verbosity > 1)
         std::cout << "Correct output " << *(bufOut + i)
-                  << " == " << *(bufInA + i) + *(bufInB + i) << std::endl;
+                  << " == " << *(bufInA + i) + *(bufInA + i) << std::endl;
     }
+  }
+  
+  // Debug
+  for (int i = 0; i < IN_SIZE; i++){
+    std::cout << "A[" << i << "] = " << *(srcVecA.data() + i) <<  ", Out[" << i << "] = " << *(bufOut + i) << "\n";
   }
 
   if (!errors) {
@@ -160,4 +160,5 @@ int main(int argc, const char *argv[]) {
     std::cout << "\nfailed.\n\n";
     return 1;
   }
+
 }

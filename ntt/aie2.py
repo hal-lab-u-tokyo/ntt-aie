@@ -41,34 +41,34 @@ def my_vector_add():
         # AIE Core Function declarations
 
         # Tile declarations
-        ShimTile = tile(int(sys.argv[2]), 0)
-        ComputeTile2 = tile(int(sys.argv[2]), 2)
-
+        _0_ShimTile = tile(0, 0)
+        _0_ComputeTile2 = tile(0, 2)
+        
+        #_1_ShimTile = tile(1, 0)
+        #_1_ComputeTile2 = tile(1, 2)
+        
+        
         # AIE-array data movement with object fifos
-        of_in1 = object_fifo("in1", ShimTile, ComputeTile2, buffer_depth, memRef_ty)
-        of_in2 = object_fifo("in2", ShimTile, ComputeTile2, buffer_depth, memRef_ty)
-        of_out = object_fifo("out", ComputeTile2, ShimTile, buffer_depth, memRef_ty)
+        of_in0 = object_fifo("in0", _0_ShimTile, _0_ComputeTile2, buffer_depth, memRef_ty)
+        of_out = object_fifo("out", _0_ComputeTile2, _0_ShimTile, buffer_depth, memRef_ty)
 
         # Set up compute tiles
 
         # Compute tile 2
-        @core(ComputeTile2)
+        @core(_0_ComputeTile2)
         def core_body():
             # Effective while(1)
             for _ in for_(sys.maxsize):
                 # Number of sub-vector "tile" iterations
                 for _ in for_(N_div_n):
-                    elem_in1 = of_in1.acquire(ObjectFifoPort.Consume, 1)
-                    elem_in2 = of_in2.acquire(ObjectFifoPort.Consume, 1)
+                    elem_in0 = of_in0.acquire(ObjectFifoPort.Consume, 1)
                     elem_out = of_out.acquire(ObjectFifoPort.Produce, 1)
                     for i in for_(n):
-                        v0 = memref.load(elem_in1, [i])
-                        v1 = memref.load(elem_in2, [i])
-                        v2 = arith.addi(v0, v1)
+                        v0 = memref.load(elem_in0, [i])
+                        v2 = arith.addi(v0, v0)
                         memref.store(v2, elem_out, [i])
                         yield_([])
-                    of_in1.release(ObjectFifoPort.Consume, 1)
-                    of_in2.release(ObjectFifoPort.Consume, 1)
+                    of_in0.release(ObjectFifoPort.Consume, 1)
                     of_out.release(ObjectFifoPort.Produce, 1)
                     yield_([])
                 yield_([])
@@ -76,11 +76,10 @@ def my_vector_add():
         # To/from AIE-array data movement
         tensor_ty = T.memref(N, T.i32())
 
-        @FuncOp.from_py_func(tensor_ty, tensor_ty, tensor_ty)
-        def sequence(A, B, C):
+        @FuncOp.from_py_func(tensor_ty, tensor_ty)
+        def sequence(A, C):
             npu_dma_memcpy_nd(metadata="out", bd_id=0, mem=C, sizes=[1, 1, 1, N])
-            npu_dma_memcpy_nd(metadata="in1", bd_id=1, mem=A, sizes=[1, 1, 1, N])
-            npu_dma_memcpy_nd(metadata="in2", bd_id=2, mem=B, sizes=[1, 1, 1, N])
+            npu_dma_memcpy_nd(metadata="in0", bd_id=1, mem=A, sizes=[1, 1, 1, N])
             npu_sync(column=0, row=0, direction=0, channel=0)
 
 
