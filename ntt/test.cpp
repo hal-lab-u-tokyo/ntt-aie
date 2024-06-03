@@ -40,8 +40,11 @@ int main(int argc, const char *argv[]) {
   int n_warmup_iterations = vm["warmup"].as<int>();
   int trace_size = vm["trace_sz"].as<int>();
 
-  constexpr int IN_SIZE = 128;
-  constexpr int OUT_SIZE = 128;
+  const int N = 256;
+  const int n_column = 2;
+  const int n_row = 4;
+  constexpr int IN_SIZE = N / n_column;
+  constexpr int OUT_SIZE = N / n_column;
 
   // Load instruction sequence
   std::vector<uint32_t> instr_v =
@@ -143,29 +146,52 @@ int main(int argc, const char *argv[]) {
 
   int errors = 0;
 
-/*
-  for (uint32_t i = 0; i < OUT_SIZE; i++) {
-    if (*(bufOut + i) != *(bufInA + i) + *(bufInA + i)) {
-      std::cout << "Error in output " << *(bufOut + i)
-                << " != " << *(bufInA + i) << " + " << *(bufInA + i)
-                << std::endl;
-      errors++;
-    } else {
-      if (verbosity > 1)
-        std::cout << "Correct output " << *(bufOut + i)
-                  << " == " << *(bufInA + i) + *(bufInA + i) << std::endl;
+  // Verify
+  for (int c = 0; c < n_column; c++) {
+    for (int i = 0; i < IN_SIZE; i++){
+      int added = c * n_row + i / (IN_SIZE / n_row);
+      switch (c) {
+        case 0:
+          if (*(bufOut0 + i) != *(bufInA0 + i) + added) {
+            std::cout << "Error in output " << *(bufOut0 + i)
+                      << " != " << *(bufInA0 + i) << " + " << added
+                      << std::endl;
+            errors++;
+          } else {
+            if (verbosity > 1)
+              std::cout << "Correct output " << *(bufOut0 + i)
+                        << " == " << *(bufInA0 + i) + added << std::endl;
+          }
+          break;
+        case 1:
+          if (*(bufOut1 + i) != *(bufInA1 + i) + added) {
+            std::cout << "Error in output " << *(bufOut1 + i)
+                      << " != " << *(bufInA1 + i) << " + " << added
+                      << std::endl;
+            errors++;
+          } else {
+            if (verbosity > 1)
+              std::cout << "Correct output " << *(bufOut1 + i)
+                        << " == " << *(bufInA1 + i) + added << std::endl;
+          }
+          break;
+      }
     }
   }
-*/
-
+  
   // Debug
-  for (int i = 0; i < IN_SIZE; i++){
-    std::cout << "A[" << i << "] = " << *(srcVecA0.data() + i) <<  ", Out[" << i << "] = " << *(bufOut0 + i) << "\n";
+  for (int c = 0; c < n_column; c++){
+    for (int i = 0; i < IN_SIZE; i++){
+      switch (c) {
+        case 0:
+          std::cout << "A[" << i << "] = " << *(srcVecA0.data() + i) <<  ", Out[" << i << "] = " << *(bufOut0 + i) << "\n";
+          break;
+        case 1:
+          std::cout << "A[" << i + IN_SIZE << "] = " << *(srcVecA1.data() + i) <<  ", Out[" << i + IN_SIZE << "] = " << *(bufOut1 + i) << "\n";
+          break;
+      }
+    }
   }
-  for (int i = 0; i < IN_SIZE; i++){
-    std::cout << "A[" << i + IN_SIZE << "] = " << *(srcVecA1.data() + i) <<  ", Out[" << i + IN_SIZE << "] = " << *(bufOut1 + i) << "\n";
-  }
-
 
   if (!errors) {
     std::cout << "\nPASS!\n\n";
