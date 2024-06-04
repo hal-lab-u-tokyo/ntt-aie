@@ -43,43 +43,25 @@ def my_vector_add():
         # AIE Core Function declarations
 
         # Tile declarations
-        _0_ShimTile = tile(0, 0)
-        _1_ShimTile = tile(1, 0)
-        _2_ShimTile = tile(2, 0)
-        _3_ShimTile = tile(3, 0)
-        _0_MemTile = tile(0, 1)
-        _1_MemTile = tile(1, 1)
-        _2_MemTile = tile(2, 1)
-        _3_MemTile = tile(3, 1)
-        ComputeTile0 = tile(0, 2)
-        ComputeTile1 = tile(0, 3)
-        ComputeTile2 = tile(0, 4)
-        ComputeTile3 = tile(0, 5)
-        ComputeTile4 = tile(1, 2)
-        ComputeTile5 = tile(1, 3)
-        ComputeTile6 = tile(1, 4)
-        ComputeTile7 = tile(1, 5)
-        ComputeTile8 = tile(2, 2)
-        ComputeTile9 = tile(2, 3)
-        ComputeTile10 = tile(2, 4)
-        ComputeTile11 = tile(2, 5)
-        ComputeTile12 = tile(3, 2)
-        ComputeTile13 = tile(3, 3)
-        ComputeTile14 = tile(3, 4)
-        ComputeTile15 = tile(3, 5)        
-        ShimTiles = [_0_ShimTile, _1_ShimTile, _2_ShimTile, _3_ShimTile]
-        MemTiles = [_0_MemTile, _1_MemTile, _2_MemTile, _3_MemTile]
-        ComputeTiles = [[ComputeTile0, ComputeTile1, ComputeTile2, ComputeTile3], [ComputeTile4, ComputeTile5, ComputeTile6, ComputeTile7], [ComputeTile8, ComputeTile9, ComputeTile10, ComputeTile11], [ComputeTile12, ComputeTile13, ComputeTile14, ComputeTile15]]
+        ShimTiles = []
+        MemTiles = []
+        ComputeTiles = []
+        for c in range(0, n_column):
+            ShimTiles.append(tile(c, 0))
+            MemTiles.append(tile(c, 1))
+            ComputeTiles.append([])
+            for r in range(0, n_row):
+                ComputeTiles[c].append(tile(c, r+2))
         
         # AIE-array data movement with object fifos
         of_ins_host = []
         of_outs_host = []
         of_ins_core = []
         of_outs_core = []
-        of_ins_host_names = ["in0", "in1", "in2", "in3"]
-        of_outs_host_names = ["out0", "out1", "out2", "out3"]
-        of_ins_core_names = [["in0_0", "in0_1", "in0_2", "in0_3"], ["in1_0", "in1_1", "in1_2", "in1_3"], ["in2_0", "in2_1", "in2_2", "in2_3"], ["in3_0", "in3_1", "in3_2", "in3_3"]]
-        of_outs_core_names = [["out0_0", "out0_1", "out0_2", "out0_3"], ["out1_0", "out1_1", "out1_2", "out1_3"], ["out2_0", "out2_1", "out2_2", "out2_3"], ["out3_0", "out3_1", "out3_2", "out3_3"]]
+        of_ins_host_names = [f"in{i}" for i in range(n_column)]
+        of_outs_host_names = [f"out{i}" for i in range(n_column)]
+        of_ins_core_names = [[f"in{i}_{j}" for j in range(n_row)] for i in range(n_column)]
+        of_outs_core_names = [[f"out{i}_{j}" for j in range(n_row)] for i in range(n_column)]
         for i in range(0, n_column):
             of_ins_core.append([])
             of_outs_core.append([])
