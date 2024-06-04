@@ -41,7 +41,7 @@ int main(int argc, const char *argv[]) {
   int trace_size = vm["trace_sz"].as<int>();
 
   const int N = 256;
-  const int n_column = 2;
+  const int n_column = 4;
   const int n_row = 4;
   const int n_array = n_column * n_row;
   constexpr int IN_SIZE = N;
