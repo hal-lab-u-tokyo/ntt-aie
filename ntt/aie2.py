@@ -99,7 +99,14 @@ def my_vector_add():
             for j in range(0, n_row):
                 ntt_top_bottom[i].append(object_fifo(f"ct_{i}{j + 2}_{i + 1}{j + 2}", ComputeTiles[i][j], ComputeTiles[i + 1][j], buffer_depth, memRef_ty_core_half))
                 ntt_bottom_top[i].append(object_fifo(f"ct_{i + 1}{j + 2}_{i}{j + 2}", ComputeTiles[i + 1][j], ComputeTiles[i][j], buffer_depth, memRef_ty_core_half))
-                
+
+        # Buffer
+        buffs = []
+        for i in range(0, n_column):
+            buffs.append([])
+            for j in range(0, n_row):
+                buffs[i].append(Buffer(ComputeTiles[i][j], [N], T.i32(), f"buffComputeTile{i}{j+2}"))
+
         # Compute tile 
         for column in range(0, n_column):
             for row in range(0, n_row):
@@ -112,52 +119,43 @@ def my_vector_add():
                         if row % 2 == 0:
                             # Stage 0 - (n-5) (inside core)
                             in_from_mem = of_ins_core[column][row].acquire(ObjectFifoPort.Consume, 1)
-                            out_to_right = ntt_left_right[column][row].acquire(ObjectFifoPort.Produce, 1)
-                            for i in for_(ndata_array_half):
+                            for i in for_(ndata_array):
                                 # NTT within a core
-	                            v0 = memref.load(in_from_mem, [i + ndata_array_half])
-                                # Write to right
-	                            memref.store(v0, out_to_right, [i])
-	                            yield_([])
-                            ntt_left_right[column][row].release(ObjectFifoPort.Produce, 1)
+                                v0 = memref.load(in_from_mem, [i])
+                                memref.store(v0, buffs[column][row], [i])
+                                yield_([])
+                            of_ins_core[column][row].release(ObjectFifoPort.Consume, 1)
                             
                             # Stage n-4
                             out_to_mem = of_outs_core[column][row].acquire(ObjectFifoPort.Produce, 1)
-                            in_from_right = ntt_right_left[column][row].acquire(ObjectFifoPort.Consume, 1)
                             for i in for_(ndata_array_half):
-                                v0 = memref.load(in_from_mem, [i])
-                                v1 = memref.load(in_from_right, [i])
+                                v0 = memref.load(buffs[column][row], [i])
+                                v1 = memref.load(buffs[column][row + 1], [i])
                                 # NTT with right
                                 memref.store(v0, out_to_mem, [i])
                                 memref.store(v1, out_to_mem, [i + ndata_array_half])
                                 yield_([])
-                            ntt_right_left[column][row].release(ObjectFifoPort.Consume, 1)
-                            of_ins_core[column][row].release(ObjectFifoPort.Consume, 1)
                             of_outs_core[column][row].release(ObjectFifoPort.Produce, 1)
                         else:
                             # Stage 0 - (n-5) (inside core)
                             in_from_mem = of_ins_core[column][row].acquire(ObjectFifoPort.Consume, 1)
-                            out_to_left = ntt_right_left[column][row-1].acquire(ObjectFifoPort.Produce, 1)
-                            for i in for_(ndata_array_half):
+                            for i in for_(ndata_array):
                                 # NTT within a core
 	                            v0 = memref.load(in_from_mem, [i])
                                 # Write to left
-	                            memref.store(v0, out_to_left, [i])
+	                            memref.store(v0, buffs[column][row], [i])
 	                            yield_([])
-                            ntt_right_left[column][row-1].release(ObjectFifoPort.Produce, 1)
-
+                            of_ins_core[column][row].release(ObjectFifoPort.Consume, 1)
+                            
                             # Stage n-4
-                            in_from_left = ntt_left_right[column][row-1].acquire(ObjectFifoPort.Consume, 1)
                             out_to_mem = of_outs_core[column][row].acquire(ObjectFifoPort.Produce, 1)
                             for i in for_(ndata_array_half):
-                                v0 = memref.load(in_from_left, [i])
-                                v1 = memref.load(in_from_mem, [i + ndata_array_half])
+                                v0 = memref.load(buffs[column][row - 1], [i + ndata_array_half])
+                                v1 = memref.load(buffs[column][row], [i + ndata_array_half])
 	                            # NTT with left
                                 memref.store(v0, out_to_mem, [i])
                                 memref.store(v1, out_to_mem, [i + ndata_array_half])
                                 yield_([])
-                            ntt_left_right[column][row-1].release(ObjectFifoPort.Consume, 1)
-                            of_ins_core[column][row].release(ObjectFifoPort.Consume, 1)
                             of_outs_core[column][row].release(ObjectFifoPort.Produce, 1)
 
                         # NTT Left-right
