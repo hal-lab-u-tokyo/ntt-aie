@@ -149,6 +149,37 @@ def my_vector_add():
                                 memref.store(v0, buffs[column][row], [i])
                                 memref.store(v1, buffs[column][row + 1], [i])
                                 yield_([])
+                            
+                            # Stage n-2
+                            if column % 2 == 1:
+                                for i in for_(ndata_array):
+                                    v0 = memref.load(buffs[column][row], [i])
+                                    v1 = memref.load(buffs[column - 1][row], [i])
+                                    # NTT with right
+                                    memref.store(v0, buffs[column][row], [i])
+                                    memref.store(v1, buffs[column - 1][row], [i])
+                                    yield_([])
+                            
+                            # 2nd Swap
+                            if column == 2:
+                                for i in for_(ndata_array):
+                                    v0 = memref.load(buffs[column - 1][row], [i])
+                                    v1 = memref.load(buffs[column][row], [i])
+                                    memref.store(v1, buffs[column - 1][row], [i])
+                                    memref.store(v0, buffs[column][row], [i])
+                                    yield_([])
+
+                            # Stage n-1
+                            if column % 2 == 1:
+                                for i in for_(ndata_array):
+                                    v0 = memref.load(buffs[column][row], [i])
+                                    v1 = memref.load(buffs[column - 1][row], [i])
+                                    # NTT with right
+                                    memref.store(v0, buffs[column][row], [i])
+                                    memref.store(v1, buffs[column - 1][row], [i])
+                                    yield_([])
+
+
                         else:
                             # Stage 0 - (n-5) (inside core)
                             in_from_mem = of_ins_core[column][row].acquire(ObjectFifoPort.Consume, 1)
@@ -184,16 +215,16 @@ def my_vector_add():
                                 memref.store(v0, buffs[column][row - 1], [i + ndata_array_half])
                                 memref.store(v1, buffs[column][row], [i + ndata_array_half])
                                 yield_([])
-                        
-                        if column % 2 == 0:
+
                             # Stage n-2
-                            for i in for_(ndata_array_half):
-                                v0 = memref.load(buffs[column][row], [i])
-                                #v1 = memref.load(buffs[column + 1][row], [i])
-	                            # NTT with left
-                                memref.store(v0, buffs[column][row], [i])
-                                #memref.store(v1, buffs[column + 1][row], [i])
-                                yield_([])
+                            if column % 2 == 1:
+                                for i in for_(ndata_array):
+                                    v0 = memref.load(buffs[column - 1][row], [i])
+                                    v1 = memref.load(buffs[column][row], [i])
+                                    # NTT with right
+                                    memref.store(v0, buffs[column - 1][row], [i])
+                                    memref.store(v1, buffs[column][row], [i])
+                                    yield_([])
 
                             # 2nd Swap
                             if column == 2:
@@ -205,33 +236,14 @@ def my_vector_add():
                                     yield_([])
 
                             # Stage n-1
-                            for i in for_(ndata_array_half):
-                                v0 = memref.load(buffs[column][row], [i])
-                                #v1 = memref.load(buffs[column + 1][row], [i])
-	                            # NTT with left
-                                memref.store(v0, buffs[column][row], [i])
-                                #memref.store(v1, buffs[column + 1][row], [i])
-                                yield_([])
-
-                        else:
-                            # Stage n-2
-                            for i in for_(ndata_array_half):
-                                v0 = memref.load(buffs[column - 1][row], [i + ndata_array_half])
-                                v1 = memref.load(buffs[column][row], [i + ndata_array_half])
-	                            # NTT with left
-                                memref.store(v0, buffs[column - 1][row], [i + ndata_array_half])
-                                memref.store(v1, buffs[column][row], [i + ndata_array_half])
-                                yield_([])
-
-                            # Stage n-1
-                            for i in for_(ndata_array_half):
-                                v0 = memref.load(buffs[column - 1][row], [i + ndata_array_half])
-                                v1 = memref.load(buffs[column][row], [i + ndata_array_half])
-	                            # NTT with left
-                                memref.store(v0, buffs[column - 1][row], [i + ndata_array_half])
-                                memref.store(v1, buffs[column][row], [i + ndata_array_half])
-                                yield_([])
-                            
+                            if column % 2 == 1:
+                                for i in for_(ndata_array):
+                                    v0 = memref.load(buffs[column - 1][row], [i])
+                                    v1 = memref.load(buffs[column][row], [i])
+                                    # NTT with right
+                                    memref.store(v0, buffs[column - 1][row], [i])
+                                    memref.store(v1, buffs[column][row], [i])
+                                    yield_([])
 
                         # Write back
                         out_to_mem = of_outs_core[column][row].acquire(ObjectFifoPort.Produce, 1)
