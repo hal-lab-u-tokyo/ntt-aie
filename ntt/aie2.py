@@ -22,6 +22,8 @@ def my_vector_add():
     n_column = 4
     n_row = 4
     n_array = n_column * n_row
+    ndata_array = N // n_array
+    ndata_array_half = ndata_array // 2
 
     buffer_depth = 2
 
@@ -35,51 +37,34 @@ def my_vector_add():
     else:
         raise ValueError("[ERROR] Device name {} is unknown".format(sys.argv[1]))
 
-    @device(dev)
+    @device(AIEDevice.npu1_4col)
     def device_body():
         memRef_ty_column = T.memref(N//n_column, T.i32())
-        memRef_ty_core = T.memref(N // n_array, T.i32())
-
+        memRef_ty_core = T.memref(ndata_array, T.i32())
+        memRef_ty_core_half = T.memref(ndata_array_half, T.i32())
+        
         # AIE Core Function declarations
 
         # Tile declarations
-        _0_ShimTile = tile(0, 0)
-        _1_ShimTile = tile(1, 0)
-        _2_ShimTile = tile(2, 0)
-        _3_ShimTile = tile(3, 0)
-        _0_MemTile = tile(0, 1)
-        _1_MemTile = tile(1, 1)
-        _2_MemTile = tile(2, 1)
-        _3_MemTile = tile(3, 1)
-        ComputeTile0 = tile(0, 2)
-        ComputeTile1 = tile(0, 3)
-        ComputeTile2 = tile(0, 4)
-        ComputeTile3 = tile(0, 5)
-        ComputeTile4 = tile(1, 2)
-        ComputeTile5 = tile(1, 3)
-        ComputeTile6 = tile(1, 4)
-        ComputeTile7 = tile(1, 5)
-        ComputeTile8 = tile(2, 2)
-        ComputeTile9 = tile(2, 3)
-        ComputeTile10 = tile(2, 4)
-        ComputeTile11 = tile(2, 5)
-        ComputeTile12 = tile(3, 2)
-        ComputeTile13 = tile(3, 3)
-        ComputeTile14 = tile(3, 4)
-        ComputeTile15 = tile(3, 5)        
-        ShimTiles = [_0_ShimTile, _1_ShimTile, _2_ShimTile, _3_ShimTile]
-        MemTiles = [_0_MemTile, _1_MemTile, _2_MemTile, _3_MemTile]
-        ComputeTiles = [[ComputeTile0, ComputeTile1, ComputeTile2, ComputeTile3], [ComputeTile4, ComputeTile5, ComputeTile6, ComputeTile7], [ComputeTile8, ComputeTile9, ComputeTile10, ComputeTile11], [ComputeTile12, ComputeTile13, ComputeTile14, ComputeTile15]]
+        ShimTiles = []
+        MemTiles = []
+        ComputeTiles = []
+        for c in range(0, n_column):
+            ShimTiles.append(tile(c, 0))
+            MemTiles.append(tile(c, 1))
+            ComputeTiles.append([])
+            for r in range(0, n_row):
+                ComputeTiles[c].append(tile(c, r+2))
         
         # AIE-array data movement with object fifos
         of_ins_host = []
         of_outs_host = []
         of_ins_core = []
         of_outs_core = []
-        of_ins_host_names = ["in0", "in1", "in2", "in3"]
-        of_outs_host_names = ["out0", "out1", "out2", "out3"]
-        of_ins_core_names = [["in0_0", "in0_1", "in0_2", "in0_3"], ["in1_0", "in1_1", "in1_2", "in1_3"], ["in2_0", "in2_1", "in2_2", "in2_3"], ["in3_0", "in3_1", "in3_2", "in3_3"]]
-        of_outs_core_names = [["out0_0", "out0_1", "out0_2", "out0_3"], ["out1_0", "out1_1", "out1_2", "out1_3"], ["out2_0", "out2_1", "out2_2", "out2_3"], ["out3_0", "out3_1", "out3_2", "out3_3"]]
+        of_ins_host_names = [f"in{i}" for i in range(n_column)]
+        of_outs_host_names = [f"out{i}" for i in range(n_column)]
+        of_ins_core_names = [[f"in{i}_{j}" for j in range(n_row)] for i in range(n_column)]
+        of_outs_core_names = [[f"out{i}_{j}" for j in range(n_row)] for i in range(n_column)]
         for i in range(0, n_column):
             of_ins_core.append([])
             of_outs_core.append([])
@@ -94,7 +79,33 @@ def my_vector_add():
                 of_outs_core[i].append(of_out_ij)
             object_fifo_link(of_ins_host[i], of_ins_core[i])
             object_fifo_link(of_outs_core[i], of_outs_host[i])
+        
+        # lef-right (row)
+        ntt_left_right = []
+        ntt_right_left = []
+        for i in range(0, n_column):
+            ntt_left_right.append([])
+            ntt_right_left.append([])
+            for j in range(0, n_row - 1):
+                ntt_left_right[i].append(object_fifo(f"ct_{i}{j + 2}_{i}{j + 3}", ComputeTiles[i][j], ComputeTiles[i][j + 1], buffer_depth, memRef_ty_core_half))
+                ntt_right_left[i].append(object_fifo(f"ct_{i}{j + 3}_{i}{j + 2}", ComputeTiles[i][j + 1], ComputeTiles[i][j], buffer_depth, memRef_ty_core_half))
+                
+        # top-bottom
+        ntt_top_bottom = []
+        ntt_bottom_top = []
+        for i in range(0, n_column - 1):
+            ntt_top_bottom.append([])
+            ntt_bottom_top.append([])
+            for j in range(0, n_row):
+                ntt_top_bottom[i].append(object_fifo(f"ct_{i}{j + 2}_{i + 1}{j + 2}", ComputeTiles[i][j], ComputeTiles[i + 1][j], buffer_depth, memRef_ty_core_half))
+                ntt_bottom_top[i].append(object_fifo(f"ct_{i + 1}{j + 2}_{i}{j + 2}", ComputeTiles[i + 1][j], ComputeTiles[i][j], buffer_depth, memRef_ty_core_half))
 
+        # Buffer
+        buffs = []
+        for i in range(0, n_column):
+            buffs.append([])
+            for j in range(0, n_row):
+                buffs[i].append(Buffer(ComputeTiles[i][j], [N], T.i32(), f"buffComputeTile{i}{j+2}"))
 
         # Compute tile 
         for column in range(0, n_column):
@@ -103,16 +114,145 @@ def my_vector_add():
                 def core_body():
                     # Effective while(1)
                     for _ in for_(2):
-                        elem_in0 = of_ins_core[column][row].acquire(ObjectFifoPort.Consume, 1)
-                        elem_out = of_outs_core[column][row].acquire(ObjectFifoPort.Produce, 1)
-                        idx = column * n_row + row
-                        for i in for_(N//n_array):
-                            v0 = memref.load(elem_in0, [i])
-                            v1 = arith.addi(v0, arith.constant(idx, T.i32()))
-                            memref.store(v1, elem_out, [i])
+                        core_idx = column * n_row + row
+                        if row % 2 == 0:
+                            # Stage 0 - (n-5) (inside core)
+                            in_from_mem = of_ins_core[column][row].acquire(ObjectFifoPort.Consume, 1)
+                            for i in for_(ndata_array):
+                                # NTT within a core
+                                v0 = memref.load(in_from_mem, [i])
+                                memref.store(v0, buffs[column][row], [i])
+                                yield_([])
+                            of_ins_core[column][row].release(ObjectFifoPort.Consume, 1)
+                            
+                            # Stage n-4
+                            for i in for_(ndata_array_half):
+                                v0 = memref.load(buffs[column][row], [i])
+                                v1 = memref.load(buffs[column][row + 1], [i])
+                                # NTT with right
+                                memref.store(v0, buffs[column][row], [i])
+                                memref.store(v1, buffs[column][row + 1], [i])
+                                yield_([])
+                            
+                            # 1st Swap
+                            if row == 2:
+                                for i in for_(ndata_array):
+                                    v0 = memref.load(buffs[column][row - 1], [i])
+                                    memref.store(v0, buffs[column][row], [i])
+                                    yield_([])
+
+                            # Stage n-3
+                            for i in for_(ndata_array_half):
+                                v0 = memref.load(buffs[column][row], [i])
+                                v1 = memref.load(buffs[column][row + 1], [i])
+                                # NTT with right
+                                memref.store(v0, buffs[column][row], [i])
+                                memref.store(v1, buffs[column][row + 1], [i])
+                                yield_([])
+                            
+                            # Stage n-2
+                            if column % 2 == 1:
+                                for i in for_(ndata_array):
+                                    v0 = memref.load(buffs[column][row], [i])
+                                    v1 = memref.load(buffs[column - 1][row], [i])
+                                    # NTT with right
+                                    memref.store(v0, buffs[column][row], [i])
+                                    memref.store(v1, buffs[column - 1][row], [i])
+                                    yield_([])
+                            
+                            # 2nd Swap
+                            if column == 2:
+                                for i in for_(ndata_array):
+                                    v0 = memref.load(buffs[column - 1][row], [i])
+                                    v1 = memref.load(buffs[column][row], [i])
+                                    memref.store(v1, buffs[column - 1][row], [i])
+                                    memref.store(v0, buffs[column][row], [i])
+                                    yield_([])
+
+                            # Stage n-1
+                            if column % 2 == 1:
+                                for i in for_(ndata_array):
+                                    v0 = memref.load(buffs[column][row], [i])
+                                    v1 = memref.load(buffs[column - 1][row], [i])
+                                    # NTT with right
+                                    memref.store(v0, buffs[column][row], [i])
+                                    memref.store(v1, buffs[column - 1][row], [i])
+                                    yield_([])
+
+
+                        else:
+                            # Stage 0 - (n-5) (inside core)
+                            in_from_mem = of_ins_core[column][row].acquire(ObjectFifoPort.Consume, 1)
+                            for i in for_(ndata_array):
+                                # NTT within a core
+	                            v0 = memref.load(in_from_mem, [i])
+                                # Write to left
+	                            memref.store(v0, buffs[column][row], [i])
+	                            yield_([])
+                            of_ins_core[column][row].release(ObjectFifoPort.Consume, 1)
+                            
+                            # Stage n-4
+                            for i in for_(ndata_array_half):
+                                v0 = memref.load(buffs[column][row - 1], [i + ndata_array_half])
+                                v1 = memref.load(buffs[column][row], [i + ndata_array_half])
+	                            # NTT with left
+                                memref.store(v0, buffs[column][row - 1], [i + ndata_array_half])
+                                memref.store(v1, buffs[column][row], [i + ndata_array_half])
+                                yield_([])
+
+                            # 1st Swap
+                            if row == 1:
+                                for i in for_(ndata_array):
+                                    v0 = memref.load(buffs[column][row + 1], [i])
+                                    memref.store(v0, buffs[column][row], [i])
+                                    yield_([])
+
+                            # Stage n-3
+                            for i in for_(ndata_array_half):
+                                v0 = memref.load(buffs[column][row - 1], [i + ndata_array_half])
+                                v1 = memref.load(buffs[column][row], [i + ndata_array_half])
+	                            # NTT with left
+                                memref.store(v0, buffs[column][row - 1], [i + ndata_array_half])
+                                memref.store(v1, buffs[column][row], [i + ndata_array_half])
+                                yield_([])
+
+                            # Stage n-2
+                            if column % 2 == 1:
+                                for i in for_(ndata_array):
+                                    v0 = memref.load(buffs[column - 1][row], [i])
+                                    v1 = memref.load(buffs[column][row], [i])
+                                    # NTT with right
+                                    memref.store(v0, buffs[column - 1][row], [i])
+                                    memref.store(v1, buffs[column][row], [i])
+                                    yield_([])
+
+                            # 2nd Swap
+                            if column == 2:
+                                for i in for_(ndata_array):
+                                    v0 = memref.load(buffs[column - 1][row], [i])
+                                    v1 = memref.load(buffs[column][row], [i])
+                                    memref.store(v1, buffs[column - 1][row], [i])
+                                    memref.store(v0, buffs[column][row], [i])
+                                    yield_([])
+
+                            # Stage n-1
+                            if column % 2 == 1:
+                                for i in for_(ndata_array):
+                                    v0 = memref.load(buffs[column - 1][row], [i])
+                                    v1 = memref.load(buffs[column][row], [i])
+                                    # NTT with right
+                                    memref.store(v0, buffs[column - 1][row], [i])
+                                    memref.store(v1, buffs[column][row], [i])
+                                    yield_([])
+
+                        # Write back
+                        out_to_mem = of_outs_core[column][row].acquire(ObjectFifoPort.Produce, 1)
+                        for i in for_(ndata_array):
+                            v0 = memref.load(buffs[column][row], [i])
+                            memref.store(v0, out_to_mem, [i])
                             yield_([])
-                        of_ins_core[column][row].release(ObjectFifoPort.Consume, 1)
                         of_outs_core[column][row].release(ObjectFifoPort.Produce, 1)
+
                         yield_([])
                     
         # To/from AIE-array data movement
