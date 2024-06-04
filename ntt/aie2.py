@@ -108,10 +108,11 @@ def my_vector_add():
 
         @FuncOp.from_py_func(tensor_ty_N, tensor_ty_N)
         def sequence(A, C):
-            npu_dma_memcpy_nd(metadata=of_outs_host_names[0], bd_id=0, mem=C, sizes=[1, 1, 1, N//n_column])
-            npu_dma_memcpy_nd(metadata=of_outs_host_names[1], bd_id=1, mem=C, sizes=[1, 1, 1, N//n_column])
-            npu_dma_memcpy_nd(metadata=of_ins_host_names[0], bd_id=2, mem=A, sizes=[1, 1, 1, N//n_column])
-            npu_dma_memcpy_nd(metadata=of_ins_host_names[1], bd_id=3, mem=A, sizes=[1, 1, 1, N//n_column])
+            for c in range(0, n_column):
+                size = N // n_column
+                offset = c * size
+                npu_dma_memcpy_nd(metadata=of_outs_host_names[c], bd_id=c, mem=C, sizes=[1, 1, 1, size], offsets=[0, 0, 0, offset])
+                npu_dma_memcpy_nd(metadata=of_ins_host_names[c], bd_id=n_column+c, mem=A, sizes=[1, 1, 1, size], offsets=[0, 0, 0, offset])
             npu_sync(column=0, row=0, direction=0, channel=0)
 
 
