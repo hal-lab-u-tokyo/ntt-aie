@@ -134,21 +134,21 @@ def my_vector_add():
                                 memref.store(v1, buffs[column][row + 1], [i])
                                 yield_([])
                             
-                            # 1st Swapp
+                            # 1st Swap
                             if row == 2:
                                 for i in for_(ndata_array):
                                     v0 = memref.load(buffs[column][row - 1], [i])
                                     memref.store(v0, buffs[column][row], [i])
                                     yield_([])
-                            
-                            # Write back
-                            out_to_mem = of_outs_core[column][row].acquire(ObjectFifoPort.Produce, 1)
-                            for i in for_(ndata_array):
+
+                            # Stage n-3
+                            for i in for_(ndata_array_half):
                                 v0 = memref.load(buffs[column][row], [i])
-                                memref.store(v0, out_to_mem, [i])
+                                v1 = memref.load(buffs[column][row + 1], [i])
+                                # NTT with right
+                                memref.store(v0, buffs[column][row], [i])
+                                memref.store(v1, buffs[column][row + 1], [i])
                                 yield_([])
-                            of_outs_core[column][row].release(ObjectFifoPort.Produce, 1)
-                            
                         else:
                             # Stage 0 - (n-5) (inside core)
                             in_from_mem = of_ins_core[column][row].acquire(ObjectFifoPort.Consume, 1)
@@ -169,21 +169,30 @@ def my_vector_add():
                                 memref.store(v1, buffs[column][row], [i + ndata_array_half])
                                 yield_([])
 
-                            # 1st Swapp
+                            # 1st Swap
                             if row == 1:
                                 for i in for_(ndata_array):
                                     v0 = memref.load(buffs[column][row + 1], [i])
                                     memref.store(v0, buffs[column][row], [i])
                                     yield_([])
-                            
-                            # Write back
-                            out_to_mem = of_outs_core[column][row].acquire(ObjectFifoPort.Produce, 1)
-                            for i in for_(ndata_array):
-                                v0 = memref.load(buffs[column][row], [i])
-                                memref.store(v0, out_to_mem, [i])
+
+                            # Stage n-3
+                            for i in for_(ndata_array_half):
+                                v0 = memref.load(buffs[column][row - 1], [i + ndata_array_half])
+                                v1 = memref.load(buffs[column][row], [i + ndata_array_half])
+	                            # NTT with left
+                                memref.store(v0, buffs[column][row - 1], [i + ndata_array_half])
+                                memref.store(v1, buffs[column][row], [i + ndata_array_half])
                                 yield_([])
-                            of_outs_core[column][row].release(ObjectFifoPort.Produce, 1)
                             
+                        # Write back
+                        out_to_mem = of_outs_core[column][row].acquire(ObjectFifoPort.Produce, 1)
+                        for i in for_(ndata_array):
+                            v0 = memref.load(buffs[column][row], [i])
+                            memref.store(v0, out_to_mem, [i])
+                            yield_([])
+                        of_outs_core[column][row].release(ObjectFifoPort.Produce, 1)
+
                         yield_([])
                     
         # To/from AIE-array data movement
