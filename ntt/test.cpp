@@ -40,8 +40,12 @@ int main(int argc, const char *argv[]) {
   int n_warmup_iterations = vm["warmup"].as<int>();
   int trace_size = vm["trace_sz"].as<int>();
 
-  constexpr int IN_SIZE = 256;
-  constexpr int OUT_SIZE = 256;
+  const int N = 256;
+  const int n_column = 4;
+  const int n_row = 4;
+  const int n_array = n_column * n_row;
+  constexpr int IN_SIZE = N;
+  constexpr int OUT_SIZE = N;
 
   // Load instruction sequence
   std::vector<uint32_t> instr_v =
@@ -102,36 +106,29 @@ int main(int argc, const char *argv[]) {
                           XCL_BO_FLAGS_CACHEABLE, kernel.group_id(0));
   auto bo_inA = xrt::bo(device, IN_SIZE * sizeof(int32_t),
                         XRT_BO_FLAGS_HOST_ONLY, kernel.group_id(2));
-  auto bo_inB = xrt::bo(device, IN_SIZE * sizeof(int32_t),
-                        XRT_BO_FLAGS_HOST_ONLY, kernel.group_id(3));
   auto bo_out = xrt::bo(device, OUT_SIZE * sizeof(int32_t),
-                        XRT_BO_FLAGS_HOST_ONLY, kernel.group_id(4));
+                        XRT_BO_FLAGS_HOST_ONLY, kernel.group_id(3));
 
   if (verbosity >= 1)
     std::cout << "Writing data into buffer objects.\n";
 
   uint32_t *bufInA = bo_inA.map<uint32_t *>();
   std::vector<uint32_t> srcVecA;
-  for (int i = 0; i < IN_SIZE; i++)
-    srcVecA.push_back(i + 1);
+  for (int i = 0; i < IN_SIZE; i++) {
+    srcVecA.push_back(i);
+  }
   memcpy(bufInA, srcVecA.data(), (srcVecA.size() * sizeof(uint32_t)));
-
-  uint32_t *bufInB = bo_inB.map<uint32_t *>();
-  std::vector<uint32_t> srcVecB;
-  for (int i = 0; i < IN_SIZE; i++)
-    srcVecB.push_back(i);
-  memcpy(bufInB, srcVecB.data(), (srcVecB.size() * sizeof(uint32_t)));
-
+  
   void *bufInstr = bo_instr.map<void *>();
   memcpy(bufInstr, instr_v.data(), instr_v.size() * sizeof(int));
 
   bo_instr.sync(XCL_BO_SYNC_BO_TO_DEVICE);
   bo_inA.sync(XCL_BO_SYNC_BO_TO_DEVICE);
-  bo_inB.sync(XCL_BO_SYNC_BO_TO_DEVICE);
-
+  
+  // Call Kernel
   if (verbosity >= 1)
     std::cout << "Running Kernel.\n";
-  auto run = kernel(bo_instr, instr_v.size(), bo_inA, bo_inB, bo_out);
+  auto run = kernel(bo_instr, instr_v.size(), bo_inA, bo_out);
   run.wait();
 
   bo_out.sync(XCL_BO_SYNC_BO_FROM_DEVICE);
@@ -140,17 +137,26 @@ int main(int argc, const char *argv[]) {
 
   int errors = 0;
 
-  for (uint32_t i = 0; i < OUT_SIZE; i++) {
-    if (*(bufOut + i) != *(bufInA + i) + *(bufInB + i)) {
+  // Verify
+  for (int i = 0; i < IN_SIZE; i++){
+    int c = i / (IN_SIZE / n_column);
+    int r = (i % (IN_SIZE / n_column)) / (IN_SIZE / n_array);
+    int added = c * n_row + r;
+    if (*(bufOut + i) != *(bufInA + i) + added) {
       std::cout << "Error in output " << *(bufOut + i)
-                << " != " << *(bufInA + i) << " + " << *(bufInB + i)
+                << " != " << *(bufInA + i) << " + " << added
                 << std::endl;
       errors++;
     } else {
       if (verbosity > 1)
         std::cout << "Correct output " << *(bufOut + i)
-                  << " == " << *(bufInA + i) + *(bufInB + i) << std::endl;
+                  << " == " << *(bufInA + i) + added << std::endl;
     }
+  }
+  
+  // Debug
+  for (int i = 0; i < IN_SIZE; i++){
+    std::cout << "A[" << i << "] = " << *(srcVecA.data() + i) <<  ", Out[" << i << "] = " << *(bufOut + i) << "\n";
   }
 
   if (!errors) {
@@ -160,4 +166,5 @@ int main(int argc, const char *argv[]) {
     std::cout << "\nfailed.\n\n";
     return 1;
   }
+
 }
