@@ -104,14 +104,14 @@ def my_vector_add():
                         yield_([])
                     
         # To/from AIE-array data movement
-        tensor_ty = T.memref(N//n_column, T.i32())
+        tensor_ty_N = T.memref(N, T.i32())
 
-        @FuncOp.from_py_func(tensor_ty, tensor_ty, tensor_ty, tensor_ty)
-        def sequence(A0, A1, C0, C1):
-            npu_dma_memcpy_nd(metadata="out0", bd_id=0, mem=C0, sizes=[1, 1, 1, N//n_column])
-            npu_dma_memcpy_nd(metadata="out1", bd_id=1, mem=C1, sizes=[1, 1, 1, N//n_column])
-            npu_dma_memcpy_nd(metadata="in0", bd_id=2, mem=A0, sizes=[1, 1, 1, N//n_column])
-            npu_dma_memcpy_nd(metadata="in1", bd_id=3, mem=A1, sizes=[1, 1, 1, N//n_column])
+        @FuncOp.from_py_func(tensor_ty_N, tensor_ty_N)
+        def sequence(A, C):
+            npu_dma_memcpy_nd(metadata=of_outs_host_names[0], bd_id=0, mem=C, sizes=[1, 1, 1, N//n_column])
+            npu_dma_memcpy_nd(metadata=of_outs_host_names[1], bd_id=1, mem=C, sizes=[1, 1, 1, N//n_column])
+            npu_dma_memcpy_nd(metadata=of_ins_host_names[0], bd_id=2, mem=A, sizes=[1, 1, 1, N//n_column])
+            npu_dma_memcpy_nd(metadata=of_ins_host_names[1], bd_id=3, mem=A, sizes=[1, 1, 1, N//n_column])
             npu_sync(column=0, row=0, direction=0, channel=0)
 
 

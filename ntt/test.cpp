@@ -43,8 +43,9 @@ int main(int argc, const char *argv[]) {
   const int N = 256;
   const int n_column = 2;
   const int n_row = 4;
-  constexpr int IN_SIZE = N / n_column;
-  constexpr int OUT_SIZE = N / n_column;
+  const int n_array = n_column * n_row;
+  constexpr int IN_SIZE = N;
+  constexpr int OUT_SIZE = N;
 
   // Load instruction sequence
   std::vector<uint32_t> instr_v =
@@ -103,94 +104,59 @@ int main(int argc, const char *argv[]) {
 
   auto bo_instr = xrt::bo(device, instr_v.size() * sizeof(int),
                           XCL_BO_FLAGS_CACHEABLE, kernel.group_id(0));
-  auto bo_inA0 = xrt::bo(device, IN_SIZE * sizeof(int32_t),
+  auto bo_inA = xrt::bo(device, IN_SIZE * sizeof(int32_t),
                         XRT_BO_FLAGS_HOST_ONLY, kernel.group_id(2));
-  auto bo_inA1 = xrt::bo(device, IN_SIZE * sizeof(int32_t),
+  auto bo_out = xrt::bo(device, OUT_SIZE * sizeof(int32_t),
                         XRT_BO_FLAGS_HOST_ONLY, kernel.group_id(3));
-  auto bo_out0 = xrt::bo(device, OUT_SIZE * sizeof(int32_t),
-                        XRT_BO_FLAGS_HOST_ONLY, kernel.group_id(4));
-  auto bo_out1 = xrt::bo(device, OUT_SIZE * sizeof(int32_t),
-                        XRT_BO_FLAGS_HOST_ONLY, kernel.group_id(5));
 
   if (verbosity >= 1)
     std::cout << "Writing data into buffer objects.\n";
 
-  uint32_t *bufInA0 = bo_inA0.map<uint32_t *>();
-  uint32_t *bufInA1 = bo_inA1.map<uint32_t *>();
-  std::vector<uint32_t> srcVecA0, srcVecA1;
+  uint32_t *bufInA = bo_inA.map<uint32_t *>();
+  std::vector<uint32_t> srcVecA;
   for (int i = 0; i < IN_SIZE; i++) {
-    srcVecA0.push_back(i);
-    srcVecA1.push_back(i + IN_SIZE);
+    srcVecA.push_back(i);
   }
-  memcpy(bufInA0, srcVecA0.data(), (srcVecA0.size() * sizeof(uint32_t)));
-  memcpy(bufInA1, srcVecA1.data(), (srcVecA1.size() * sizeof(uint32_t)));
+  memcpy(bufInA, srcVecA.data(), (srcVecA.size() * sizeof(uint32_t)));
   
   void *bufInstr = bo_instr.map<void *>();
   memcpy(bufInstr, instr_v.data(), instr_v.size() * sizeof(int));
 
   bo_instr.sync(XCL_BO_SYNC_BO_TO_DEVICE);
-  bo_inA0.sync(XCL_BO_SYNC_BO_TO_DEVICE);
-  bo_inA1.sync(XCL_BO_SYNC_BO_TO_DEVICE);
+  bo_inA.sync(XCL_BO_SYNC_BO_TO_DEVICE);
   
   // Call Kernel
   if (verbosity >= 1)
     std::cout << "Running Kernel.\n";
-  auto run = kernel(bo_instr, instr_v.size(), bo_inA0, bo_inA1, bo_out0, bo_out1);
+  auto run = kernel(bo_instr, instr_v.size(), bo_inA, bo_out);
   run.wait();
 
-  bo_out0.sync(XCL_BO_SYNC_BO_FROM_DEVICE);
-  bo_out1.sync(XCL_BO_SYNC_BO_FROM_DEVICE);
+  bo_out.sync(XCL_BO_SYNC_BO_FROM_DEVICE);
 
-  uint32_t *bufOut0 = bo_out0.map<uint32_t *>();
-  uint32_t *bufOut1 = bo_out1.map<uint32_t *>();
+  uint32_t *bufOut = bo_out.map<uint32_t *>();
 
   int errors = 0;
 
   // Verify
-  for (int c = 0; c < n_column; c++) {
-    for (int i = 0; i < IN_SIZE; i++){
-      int added = c * n_row + i / (IN_SIZE / n_row);
-      switch (c) {
-        case 0:
-          if (*(bufOut0 + i) != *(bufInA0 + i) + added) {
-            std::cout << "Error in output " << *(bufOut0 + i)
-                      << " != " << *(bufInA0 + i) << " + " << added
-                      << std::endl;
-            errors++;
-          } else {
-            if (verbosity > 1)
-              std::cout << "Correct output " << *(bufOut0 + i)
-                        << " == " << *(bufInA0 + i) + added << std::endl;
-          }
-          break;
-        case 1:
-          if (*(bufOut1 + i) != *(bufInA1 + i) + added) {
-            std::cout << "Error in output " << *(bufOut1 + i)
-                      << " != " << *(bufInA1 + i) << " + " << added
-                      << std::endl;
-            errors++;
-          } else {
-            if (verbosity > 1)
-              std::cout << "Correct output " << *(bufOut1 + i)
-                        << " == " << *(bufInA1 + i) + added << std::endl;
-          }
-          break;
-      }
+  for (int i = 0; i < IN_SIZE; i++){
+    int c = i / (IN_SIZE / n_column);
+    int r = (i % (IN_SIZE / n_column)) / (IN_SIZE / n_array);
+    int added = c * n_row + r;
+    if (*(bufOut + i) != *(bufInA + i) + added) {
+      std::cout << "Error in output " << *(bufOut + i)
+                << " != " << *(bufInA + i) << " + " << added
+                << std::endl;
+      errors++;
+    } else {
+      if (verbosity > 1)
+        std::cout << "Correct output " << *(bufOut + i)
+                  << " == " << *(bufInA + i) + added << std::endl;
     }
   }
   
   // Debug
-  for (int c = 0; c < n_column; c++){
-    for (int i = 0; i < IN_SIZE; i++){
-      switch (c) {
-        case 0:
-          std::cout << "A[" << i << "] = " << *(srcVecA0.data() + i) <<  ", Out[" << i << "] = " << *(bufOut0 + i) << "\n";
-          break;
-        case 1:
-          std::cout << "A[" << i + IN_SIZE << "] = " << *(srcVecA1.data() + i) <<  ", Out[" << i + IN_SIZE << "] = " << *(bufOut1 + i) << "\n";
-          break;
-      }
-    }
+  for (int i = 0; i < IN_SIZE; i++){
+    std::cout << "A[" << i << "] = " << *(srcVecA.data() + i) <<  ", Out[" << i << "] = " << *(bufOut + i) << "\n";
   }
 
   if (!errors) {
