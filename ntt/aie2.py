@@ -107,6 +107,9 @@ def my_vector_add():
         ntt_top_bottom = [of_ct_02_12, of_ct_03_13, of_ct_04_14, of_ct_05_15, of_ct_22_32, of_ct_23_33, of_ct_24_34, of_ct_25_35]
         swap_left_right = [of_ct_03_04, of_ct_13_14, of_ct_23_24, of_ct_33_34]
         swap_top_bottom = [of_ct_12_22, of_ct_13_23, of_ct_14_24, of_ct_15_25]
+            
+        # Buffer 
+        aComputeTile15 = Buffer(ComputeTiles[3][3], [16], T.i32(), "aComputeTile15") 
 
         # Compute tile 
         for column in range(0, n_column):
@@ -115,16 +118,42 @@ def my_vector_add():
                 def core_body():
                     # Effective while(1)
                     for _ in for_(2):
-                        elem_in0 = of_ins_core[column][row].acquire(ObjectFifoPort.Consume, 1)
-                        elem_out = of_outs_core[column][row].acquire(ObjectFifoPort.Produce, 1)
-                        idx = column * n_row + row
-                        for i in for_(N//n_array):
-                            v0 = memref.load(elem_in0, [i])
-                            v1 = arith.addi(v0, arith.constant(idx, T.i32()))
-                            memref.store(v1, elem_out, [i])
-                            yield_([])
-                        of_ins_core[column][row].release(ObjectFifoPort.Consume, 1)
-                        of_outs_core[column][row].release(ObjectFifoPort.Produce, 1)
+                        # Init value
+                        core_idx = column * n_row + row
+                        if row % 2 == 0:
+                            in_from_mem = of_ins_core[column][row].acquire(ObjectFifoPort.Consume, 1)
+                            out_to_right = ntt_left_right[column * 2 + row // 2].acquire(ObjectFifoPort.Produce, 1)
+                            out_to_mem = of_outs_core[column][row].acquire(ObjectFifoPort.Produce, 1)
+                            for i in for_(N//n_array):
+	                              v0 = memref.load(in_from_mem, [i])
+	                              # NTT within a core
+	                              memref.store(v0, out_to_right, [i])
+	                              memref.store(v0, out_to_mem, [i])
+	                              yield_([])
+                            ntt_left_right[column * 2 + row // 2].release(ObjectFifoPort.Produce, 1)
+                            of_ins_core[column][row].release(ObjectFifoPort.Consume, 1)
+                            of_outs_core[column][row].release(ObjectFifoPort.Produce, 1)
+                        else:
+                            in_from_mem = of_ins_core[column][row].acquire(ObjectFifoPort.Consume, 1)
+                            out_to_mem = of_outs_core[column][row].acquire(ObjectFifoPort.Produce, 1)
+                            in_from_left = ntt_left_right[column * 2 + row // 2].acquire(ObjectFifoPort.Consume, 1)
+                            for i in for_(N//n_array):
+	                              v0 = memref.load(in_from_mem, [i])
+	                              # NTT within a core
+	                              v1 = memref.load(in_from_left, [i])
+	                              v2 = arith.addi(v0, v1)
+	                              memref.store(v2, out_to_mem, [i])
+	                              yield_([])
+                            ntt_left_right[column * 2 + row // 2].release(ObjectFifoPort.Consume, 1)
+                            of_ins_core[column][row].release(ObjectFifoPort.Consume, 1)
+                            of_outs_core[column][row].release(ObjectFifoPort.Produce, 1)
+
+                        # NTT Left-right
+                        # Swap left-right
+                        # NTT left-right
+                        # NTT top-bottom
+                        # Swap top-bottom
+                        # NTT top-bottom
                         yield_([])
                     
         # To/from AIE-array data movement
