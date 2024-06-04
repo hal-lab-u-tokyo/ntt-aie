@@ -76,7 +76,37 @@ def my_vector_add():
                 of_outs_core[i].append(of_out_ij)
             object_fifo_link(of_ins_host[i], of_ins_core[i])
             object_fifo_link(of_outs_core[i], of_outs_host[i])
-
+        
+        # lef-right
+        of_ct_02_03 = object_fifo("ct_02_03", ComputeTiles[0][0], ComputeTiles[0][1], buffer_depth, memRef_ty_core)
+        of_ct_03_04 = object_fifo("ct_03_04", ComputeTiles[0][1], ComputeTiles[0][2], buffer_depth, memRef_ty_core)
+        of_ct_04_05 = object_fifo("ct_04_05", ComputeTiles[0][2], ComputeTiles[0][3], buffer_depth, memRef_ty_core)
+        of_ct_12_13 = object_fifo("ct_12_13", ComputeTiles[1][0], ComputeTiles[1][1], buffer_depth, memRef_ty_core)
+        of_ct_13_14 = object_fifo("ct_13_14", ComputeTiles[1][1], ComputeTiles[1][2], buffer_depth, memRef_ty_core)
+        of_ct_14_15 = object_fifo("ct_14_15", ComputeTiles[1][2], ComputeTiles[1][3], buffer_depth, memRef_ty_core)
+        of_ct_22_23 = object_fifo("ct_22_23", ComputeTiles[2][0], ComputeTiles[2][1], buffer_depth, memRef_ty_core)
+        of_ct_23_24 = object_fifo("ct_23_24", ComputeTiles[2][1], ComputeTiles[2][2], buffer_depth, memRef_ty_core)
+        of_ct_24_25 = object_fifo("ct_24_25", ComputeTiles[2][2], ComputeTiles[2][3], buffer_depth, memRef_ty_core)
+        of_ct_32_33 = object_fifo("ct_32_33", ComputeTiles[3][0], ComputeTiles[3][1], buffer_depth, memRef_ty_core)
+        of_ct_33_34 = object_fifo("ct_33_34", ComputeTiles[3][1], ComputeTiles[3][2], buffer_depth, memRef_ty_core)
+        of_ct_34_35 = object_fifo("ct_34_35", ComputeTiles[3][2], ComputeTiles[3][3], buffer_depth, memRef_ty_core)
+        # top-bottom
+        of_ct_02_12 = object_fifo("ct_02_12", ComputeTiles[0][0], ComputeTiles[1][0], buffer_depth, memRef_ty_core)
+        of_ct_03_13 = object_fifo("ct_03_13", ComputeTiles[0][1], ComputeTiles[1][1], buffer_depth, memRef_ty_core)
+        of_ct_04_14 = object_fifo("ct_04_14", ComputeTiles[0][2], ComputeTiles[1][2], buffer_depth, memRef_ty_core)
+        of_ct_05_15 = object_fifo("ct_05_15", ComputeTiles[0][3], ComputeTiles[1][3], buffer_depth, memRef_ty_core)
+        of_ct_12_22 = object_fifo("ct_12_22", ComputeTiles[1][0], ComputeTiles[2][0], buffer_depth, memRef_ty_core)
+        of_ct_13_23 = object_fifo("ct_13_23", ComputeTiles[1][1], ComputeTiles[2][1], buffer_depth, memRef_ty_core)
+        of_ct_14_24 = object_fifo("ct_14_24", ComputeTiles[1][2], ComputeTiles[2][2], buffer_depth, memRef_ty_core)
+        of_ct_15_25 = object_fifo("ct_15_25", ComputeTiles[1][3], ComputeTiles[2][3], buffer_depth, memRef_ty_core)
+        of_ct_22_32 = object_fifo("ct_22_32", ComputeTiles[2][0], ComputeTiles[3][0], buffer_depth, memRef_ty_core)
+        of_ct_23_33 = object_fifo("ct_23_33", ComputeTiles[2][1], ComputeTiles[3][1], buffer_depth, memRef_ty_core)
+        of_ct_24_34 = object_fifo("ct_24_34", ComputeTiles[2][2], ComputeTiles[3][2], buffer_depth, memRef_ty_core)
+        of_ct_25_35 = object_fifo("ct_25_35", ComputeTiles[2][3], ComputeTiles[3][3], buffer_depth, memRef_ty_core)
+        ntt_left_right = [of_ct_02_03, of_ct_04_05, of_ct_12_13, of_ct_14_15, of_ct_22_23, of_ct_24_25, of_ct_32_33, of_ct_34_35]
+        ntt_top_bottom = [of_ct_02_12, of_ct_03_13, of_ct_04_14, of_ct_05_15, of_ct_22_32, of_ct_23_33, of_ct_24_34, of_ct_25_35]
+        swap_left_right = [of_ct_03_04, of_ct_13_14, of_ct_23_24, of_ct_33_34]
+        swap_top_bottom = [of_ct_12_22, of_ct_13_23, of_ct_14_24, of_ct_15_25]
 
         # Compute tile 
         for column in range(0, n_column):
