@@ -37,7 +37,7 @@ def my_vector_add():
     else:
         raise ValueError("[ERROR] Device name {} is unknown".format(sys.argv[1]))
 
-    @device(dev)
+    @device(AIEDevice.npu1_4col)
     def device_body():
         memRef_ty_column = T.memref(N//n_column, T.i32())
         memRef_ty_core = T.memref(ndata_array, T.i32())
@@ -184,7 +184,55 @@ def my_vector_add():
                                 memref.store(v0, buffs[column][row - 1], [i + ndata_array_half])
                                 memref.store(v1, buffs[column][row], [i + ndata_array_half])
                                 yield_([])
+                        
+                        if column % 2 == 0:
+                            # Stage n-2
+                            for i in for_(ndata_array_half):
+                                v0 = memref.load(buffs[column][row], [i])
+                                #v1 = memref.load(buffs[column + 1][row], [i])
+	                            # NTT with left
+                                memref.store(v0, buffs[column][row], [i])
+                                #memref.store(v1, buffs[column + 1][row], [i])
+                                yield_([])
+
+                            # 2nd Swap
+                            if column == 2:
+                                for i in for_(ndata_array):
+                                    v0 = memref.load(buffs[column - 1][row], [i])
+                                    v1 = memref.load(buffs[column][row], [i])
+                                    memref.store(v1, buffs[column - 1][row], [i])
+                                    memref.store(v0, buffs[column][row], [i])
+                                    yield_([])
+
+                            # Stage n-1
+                            for i in for_(ndata_array_half):
+                                v0 = memref.load(buffs[column][row], [i])
+                                #v1 = memref.load(buffs[column + 1][row], [i])
+	                            # NTT with left
+                                memref.store(v0, buffs[column][row], [i])
+                                #memref.store(v1, buffs[column + 1][row], [i])
+                                yield_([])
+
+                        else:
+                            # Stage n-2
+                            for i in for_(ndata_array_half):
+                                v0 = memref.load(buffs[column - 1][row], [i + ndata_array_half])
+                                v1 = memref.load(buffs[column][row], [i + ndata_array_half])
+	                            # NTT with left
+                                memref.store(v0, buffs[column - 1][row], [i + ndata_array_half])
+                                memref.store(v1, buffs[column][row], [i + ndata_array_half])
+                                yield_([])
+
+                            # Stage n-1
+                            for i in for_(ndata_array_half):
+                                v0 = memref.load(buffs[column - 1][row], [i + ndata_array_half])
+                                v1 = memref.load(buffs[column][row], [i + ndata_array_half])
+	                            # NTT with left
+                                memref.store(v0, buffs[column - 1][row], [i + ndata_array_half])
+                                memref.store(v1, buffs[column][row], [i + ndata_array_half])
+                                yield_([])
                             
+
                         # Write back
                         out_to_mem = of_outs_core[column][row].acquire(ObjectFifoPort.Produce, 1)
                         for i in for_(ndata_array):
