@@ -106,6 +106,10 @@ def my_vector_add():
             buffs.append([])
             for j in range(0, n_row):
                 buffs[i].append(Buffer(ComputeTiles[i][j], [N], T.i32(), f"buffComputeTile{i}{j+2}"))
+        
+        # Lock
+        lock_ct0 = lock(ComputeTiles[0][0], lock_id = 0, init = 1)
+        lock_ct0_cons = lock(ComputeTiles[0][0], lock_id = 1, init = 0)
 
         # Compute tile 
         for column in range(0, n_column):
