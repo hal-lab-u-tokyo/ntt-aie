@@ -10,20 +10,22 @@ srcdir := $(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
 
 include ${srcdir}/../makefile-common
 
-targetname = vectorAdd
-devicename = npu
-col = 0
+all: build/final.xclbin build/insts.txt
 
-all: build/final.xclbin
+targetname = vectorScalar
 
 build/aie.mlir: ${srcdir}/aie2.py
 	mkdir -p ${@D}
-	python3 $< ${devicename} ${col} > $@
-
-build/final.xclbin: build/aie.mlir
+	python3 $< > $@
+	
+build/scale.o: ${srcdir}/vector_scalar_mul.cc
 	mkdir -p ${@D}
-	cd ${@D} && aiecc.py --aie-generate-cdo --aie-generate-npu --no-compile-host \
-		--xclbin-name=${@F} --npu-insts-name=insts.txt ${<F}
+	cd ${@D} && xchesscc_wrapper ${CHESSCCWRAP2_FLAGS} -c $< -o ${@F}
+
+build/final.xclbin: build/aie.mlir build/scale.o
+	mkdir -p ${@D}
+	cd ${@D} && aiecc.py --aie-generate-cdo --no-compile-host --xclbin-name=${@F} \
+				--aie-generate-npu --npu-insts-name=insts.txt $(<:%=../%)
 
 ${targetname}.exe: ${srcdir}/test.cpp
 	rm -rf _build
@@ -34,30 +36,14 @@ ifeq "${powershell}" "powershell.exe"
 	cp _build/${targetname}.exe $@
 else
 	cp _build/${targetname} $@ 
-endif
-
-# Changing variables when we target VCK5000
-ACDC_AIE = $(dir $(shell which aie-opt))/..
-
-vck5000: devicename=xcvc1902
-vck5000: col=6
-
-vck5000: build/aie.mlir
-	aiecc.py --xchesscc --link_against_hsa --host-target=x86_64-amd-linux-gnu build/aie.mlir \
-		-I/opt/xaiengine/include \
-		-I${srcdir}/../../../install/runtime_lib/x86_64-hsa/test_lib/include \
-		-L/opt/xaiengine/lib \
-		-L/lib/x86_64-linux-gnu/ \
-		${srcdir}/test_vck5000.cpp \
-		${srcdir}/../../../install/runtime_lib/x86_64-hsa/test_lib/src/test_library.cpp \
-		-Wl,-R/opt/xaiengine/lib \
-		-Wl,--whole-archive -Wl,--no-whole-archive -lstdc++ -ldl -lelf -o test.elf
-
-host: ntt_on_cpu.cc
-	g++ -o host $<
+endif 
 
 run: ${targetname}.exe build/final.xclbin build/insts.txt 
 	${powershell} ./$< -x build/final.xclbin -i build/insts.txt -k MLIR_AIE
 
-clean:
-	rm -rf build _build inst aie.mlir.prj core_* test.elf ${targetname}.exe
+run_py: build/final.xclbin build/insts.txt
+	${powershell} python3 ${srcdir}/test.py -x build/final.xclbin -i build/insts.txt -k MLIR_AIE
+
+clean: 
+	rm -rf build _build ${targetname}.exe
+

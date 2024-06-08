@@ -1,4 +1,4 @@
-//===- test.cpp -------------------------------------------000---*- C++ -*-===//
+//===- test.cpp -------------------------------------------------*- C++ -*-===//
 //
 // This file is licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -8,152 +8,124 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include <boost/program_options.hpp>
 #include <cstdint>
 #include <fstream>
 #include <iostream>
 #include <sstream>
-#include <string>
-#include <vector>
-
-#include "xrt/xrt_bo.h"
-#include "xrt/xrt_device.h"
-#include "xrt/xrt_kernel.h"
 
 #include "test_utils.h"
+#include "xrt/xrt_bo.h"
+
+#ifndef DATATYPES_USING_DEFINED
+#define DATATYPES_USING_DEFINED
+using DATATYPE = std::uint32_t; // Configure this to match your buffer data type
+#endif
+
+const int scaleFactor = 3;
 
 namespace po = boost::program_options;
 
 int main(int argc, const char *argv[]) {
 
-  // ------------------------------------------------------
-  // Parse program arguments
-  // ------------------------------------------------------
+  // Program arguments parsing
   po::options_description desc("Allowed options");
   po::variables_map vm;
   test_utils::add_default_options(desc);
 
   test_utils::parse_options(argc, argv, desc, vm);
   int verbosity = vm["verbosity"].as<int>();
-  int do_verify = vm["verify"].as<bool>();
-  int n_iterations = vm["iters"].as<int>();
-  int n_warmup_iterations = vm["warmup"].as<int>();
-  int trace_size = vm["trace_sz"].as<int>();
 
+  constexpr bool VERIFY = true;
   constexpr int IN_SIZE = 16;
-  constexpr int OUT_SIZE = 16;
+  constexpr int OUT_SIZE = IN_SIZE;
 
   // Load instruction sequence
   std::vector<uint32_t> instr_v =
       test_utils::load_instr_sequence(vm["instr"].as<std::string>());
+
   if (verbosity >= 1)
     std::cout << "Sequence instr count: " << instr_v.size() << "\n";
 
-  // ------------------------------------------------------
-  // Get device, load the xclbin & kernel and register them
-  // ------------------------------------------------------
-  // Get a device handle
-  unsigned int device_index = 0;
-  auto device = xrt::device(device_index);
+  // Start the XRT context and load the kernel
+  xrt::device device;
+  xrt::kernel kernel;
 
-  // Load the xclbin
-  if (verbosity >= 1)
-    std::cout << "Loading xclbin: " << vm["xclbin"].as<std::string>() << "\n";
-  auto xclbin = xrt::xclbin(vm["xclbin"].as<std::string>());
+  test_utils::init_xrt_load_kernel(device, kernel, verbosity,
+                                   vm["xclbin"].as<std::string>(),
+                                   vm["kernel"].as<std::string>());
 
-  // Load the kernel
-  if (verbosity >= 1)
-    std::cout << "Kernel opcode: " << vm["kernel"].as<std::string>() << "\n";
-  std::string Node = vm["kernel"].as<std::string>();
-
-  // Get the kernel from the xclbin
-  auto xkernels = xclbin.get_kernels();
-  auto xkernel = *std::find_if(xkernels.begin(), xkernels.end(),
-                               [Node, verbosity](xrt::xclbin::kernel &k) {
-                                 auto name = k.get_name();
-                                 if (verbosity >= 1) {
-                                   std::cout << "Name: " << name << std::endl;
-                                 }
-                                 return name.rfind(Node, 0) == 0;
-                               });
-  auto kernelName = xkernel.get_name();
-
-  // Register xclbin
-  if (verbosity >= 1)
-    std::cout << "Registering xclbin: " << vm["xclbin"].as<std::string>()
-              << "\n";
-  device.register_xclbin(xclbin);
-
-  // Get a hardware context
-  if (verbosity >= 1)
-    std::cout << "Getting hardware context.\n";
-  xrt::hw_context context(device, xclbin.get_uuid());
-
-  // Get a kernel handle
-  if (verbosity >= 1)
-    std::cout << "Getting handle to kernel:" << kernelName << "\n";
-  auto kernel = xrt::kernel(context, kernelName);
-
-  // ------------------------------------------------------
-  // Initialize input/ output buffer sizes and sync them
-  // ------------------------------------------------------
-
+  // set up the buffer objects
   auto bo_instr = xrt::bo(device, instr_v.size() * sizeof(int),
                           XCL_BO_FLAGS_CACHEABLE, kernel.group_id(0));
-  auto bo_inA = xrt::bo(device, IN_SIZE * sizeof(int32_t),
+  auto bo_inA = xrt::bo(device, IN_SIZE * sizeof(DATATYPE),
                         XRT_BO_FLAGS_HOST_ONLY, kernel.group_id(2));
-  auto bo_out = xrt::bo(device, OUT_SIZE * sizeof(int32_t),
-                        XRT_BO_FLAGS_HOST_ONLY, kernel.group_id(4));
+  auto bo_inFactor = xrt::bo(device, 1 * sizeof(DATATYPE),
+                             XRT_BO_FLAGS_HOST_ONLY, kernel.group_id(3));
+  auto bo_outC = xrt::bo(device, OUT_SIZE * sizeof(DATATYPE),
+                         XRT_BO_FLAGS_HOST_ONLY, kernel.group_id(4));
 
   if (verbosity >= 1)
     std::cout << "Writing data into buffer objects.\n";
 
-  uint32_t *bufInA = bo_inA.map<uint32_t *>();
-  std::vector<uint32_t> srcVecA;
-  for (int i = 0; i < IN_SIZE; i++)
-    srcVecA.push_back(i + 1);
-  memcpy(bufInA, srcVecA.data(), (srcVecA.size() * sizeof(uint32_t)));
-
+  // Copy instruction stream to xrt buffer object
   void *bufInstr = bo_instr.map<void *>();
   memcpy(bufInstr, instr_v.data(), instr_v.size() * sizeof(int));
 
+  // Initialize buffer bo_inA
+  DATATYPE *bufInA = bo_inA.map<DATATYPE *>();
+  for (int i = 0; i < IN_SIZE; i++)
+    bufInA[i] = i + 1;
+
+  // Initialize buffer bo_inFactor
+  DATATYPE *bufInFactor = bo_inFactor.map<DATATYPE *>();
+  *bufInFactor = scaleFactor;
+
+  // Zero out buffer bo_outC
+  DATATYPE *bufOut = bo_outC.map<DATATYPE *>();
+  memset(bufOut, 0, OUT_SIZE * sizeof(DATATYPE));
+
+  // sync host to device memories
   bo_instr.sync(XCL_BO_SYNC_BO_TO_DEVICE);
   bo_inA.sync(XCL_BO_SYNC_BO_TO_DEVICE);
+  bo_inFactor.sync(XCL_BO_SYNC_BO_TO_DEVICE);
+  bo_outC.sync(XCL_BO_SYNC_BO_TO_DEVICE);
 
+  // Execute the kernel and wait to finish
   if (verbosity >= 1)
     std::cout << "Running Kernel.\n";
-  auto run = kernel(bo_instr, instr_v.size(), bo_inA, bo_out);
+  auto run = kernel(bo_instr, instr_v.size(), bo_inA, bo_inFactor, bo_outC);
   run.wait();
 
-  bo_out.sync(XCL_BO_SYNC_BO_FROM_DEVICE);
+  // Sync device to host memories
+  bo_outC.sync(XCL_BO_SYNC_BO_FROM_DEVICE);
 
-  uint32_t *bufOut = bo_out.map<uint32_t *>();
-
+  // Compare out to golden
   int errors = 0;
-
-  for (uint32_t i = 0; i < OUT_SIZE; i++) {
-    if (*(bufOut + i) != *(bufInA + i) * 2) {
-      std::cout << "Error in output " << *(bufOut + i)
-                << " != " << *(bufInA + i) * 2
-                << std::endl;
+  if (verbosity >= 1) {
+    std::cout << "Verifying results ..." << std::endl;
+  }
+  for (uint32_t i = 0; i < IN_SIZE; i++) {
+    int32_t ref = bufInA[i] * scaleFactor;
+    int32_t test = bufOut[i];
+    if (test != ref) {
+      if (verbosity >= 1)
+        std::cout << "Error in output " << test << " != " << ref << std::endl;
       errors++;
     } else {
-      if (verbosity > 1)
-        std::cout << "Correct output " << *(bufOut + i)
-                  << " == " << *(bufInA + i) * 2 << std::endl;
+      if (verbosity >= 1)
+        std::cout << "Correct output " << test << " == " << ref << std::endl;
     }
   }
 
-  // Debug
-  for (int i = 0; i < IN_SIZE; i++){
-    std::cout << "A[" << i << "] = " << *(srcVecA.data() + i) <<  ", Out[" << i << "] = " << *(bufOut + i) << "\n";
-  }
-
+  // Print Pass/Fail result of our test
   if (!errors) {
-    std::cout << "\nPASS!\n\n";
+    std::cout << std::endl << "PASS!" << std::endl << std::endl;
     return 0;
   } else {
-    std::cout << "\nfailed.\n\n";
+    std::cout << std::endl
+              << errors << " mismatches." << std::endl
+              << std::endl;
+    std::cout << std::endl << "fail." << std::endl << std::endl;
     return 1;
   }
 }

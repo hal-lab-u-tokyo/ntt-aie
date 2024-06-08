@@ -1,4 +1,4 @@
-# vector_vector_add/aie2.py -*- Python -*-
+# section-3/aie2.py -*- Python -*-
 #
 # This file is licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
@@ -12,71 +12,64 @@ from aie.dialects.aie import *
 from aie.dialects.aiex import *
 from aie.dialects.scf import *
 from aie.extras.context import mlir_mod_ctx
-from aie.extras.dialects.ext import memref, arith
 
-import sys
+import aie.utils.trace as trace_utils
 
 
-def my_vector_add():
+def my_vector_scalar():
     N = 16
-    
-    buffer_depth = 2
 
-    if len(sys.argv) != 3:
-        raise ValueError("[ERROR] Need 2 command line arguments (Device name, Col)")
-
-    if sys.argv[1] == "npu":
-        dev = AIEDevice.npu1_1col
-    elif sys.argv[1] == "xcvc1902":
-        dev = AIEDevice.xcvc1902
-    else:
-        raise ValueError("[ERROR] Device name {} is unknown".format(sys.argv[1]))
-
-    @device(dev)
+    @device(AIEDevice.npu1_1col)
     def device_body():
         memRef_ty = T.memref(N, T.i32())
 
         # AIE Core Function declarations
+        scale_scalar = external_func(
+            "vector_scalar_mul_aie_scalar",
+            inputs=[memRef_ty, memRef_ty, T.memref(1, T.i32()), T.i32()],
+        )
 
         # Tile declarations
-        ShimTile = tile(int(sys.argv[2]), 0)
-        ComputeTile2 = tile(int(sys.argv[2]), 2)
+        ShimTile = tile(0, 0)
+        ComputeTile2 = tile(0, 2)
 
         # AIE-array data movement with object fifos
-        of_in1 = object_fifo("in1", ShimTile, ComputeTile2, buffer_depth, memRef_ty)
-        of_out = object_fifo("out", ComputeTile2, ShimTile, buffer_depth, memRef_ty)
+        of_in = object_fifo("in", ShimTile, ComputeTile2, 2, memRef_ty)
+        of_factor = object_fifo(
+            "infactor", ShimTile, ComputeTile2, 2, T.memref(1, T.i32())
+        )
+        of_out = object_fifo("out", ComputeTile2, ShimTile, 2, memRef_ty)
 
         # Set up compute tiles
-
         # Compute tile 2
-        @core(ComputeTile2)
+        @core(ComputeTile2, "scale.o")
         def core_body():
             # Effective while(1)
             for _ in for_(sys.maxsize):
+                elem_factor = of_factor.acquire(ObjectFifoPort.Consume, 1)
                 # Number of sub-vector "tile" iterations
-                elem_in1 = of_in1.acquire(ObjectFifoPort.Consume, 1)
                 elem_out = of_out.acquire(ObjectFifoPort.Produce, 1)
-                for i in for_(N):
-                    v0 = memref.load(elem_in1, [i])
-                    v2 = arith.addi(v0, v0)
-                    memref.store(v2, elem_out, [i])
-                    yield_([])
-                of_in1.release(ObjectFifoPort.Consume, 1)
+                elem_in = of_in.acquire(ObjectFifoPort.Consume, 1)
+                call(scale_scalar, [elem_in, elem_out, elem_factor, N])
+                of_in.release(ObjectFifoPort.Consume, 1)
                 of_out.release(ObjectFifoPort.Produce, 1)
+                of_factor.release(ObjectFifoPort.Consume, 1)
                 yield_([])
-                
+
         # To/from AIE-array data movement
         tensor_ty = T.memref(N, T.i32())
+        scalar_ty = T.memref(1, T.i32())
 
-        @FuncOp.from_py_func(tensor_ty, tensor_ty)
-        def sequence(A, C):
+        @FuncOp.from_py_func(tensor_ty, scalar_ty, tensor_ty)
+        def sequence(A, F, C):
             npu_dma_memcpy_nd(metadata="out", bd_id=0, mem=C, sizes=[1, 1, 1, N])
-            npu_dma_memcpy_nd(metadata="in1", bd_id=1, mem=A, sizes=[1, 1, 1, N])
+            npu_dma_memcpy_nd(metadata="in", bd_id=1, mem=A, sizes=[1, 1, 1, N])
+            npu_dma_memcpy_nd(metadata="infactor", bd_id=2, mem=F, sizes=[1, 1, 1, 1])
             npu_sync(column=0, row=0, direction=0, channel=0)
 
 
 with mlir_mod_ctx() as ctx:
-    my_vector_add()
+    my_vector_scalar()
     res = ctx.module.operation.verify()
     if res == True:
         print(ctx.module)
