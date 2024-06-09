@@ -18,7 +18,7 @@ import aie.utils.trace as trace_utils
 
 
 def my_vector_scalar():
-    N = 1024
+    N = 16
     N_div_n = 4  # chop input vector into 4 sub-vectors
     n = N // N_div_n
 
@@ -30,13 +30,8 @@ def my_vector_scalar():
         memRef_scalar = T.memref(1, T.i32())
 
         # AIE Core Function declarations
-
-        scale_scalar = external_func(
-            "vector_scalar_mul_scalar",
-            inputs=[memRef_vec, memRef_vec, memRef_scalar, T.i32()],
-        )
-        scale_vector = external_func(
-            "vector_scalar_mul_vectorized_int32",
+        ntt_stage0_to_Nminus5 = external_func(
+            "ntt_stage0_to_Nminus5",
             inputs=[memRef_vec, memRef_vec, memRef_scalar, T.i32()],
         )
 
@@ -51,9 +46,12 @@ def my_vector_scalar():
         )
         of_out = object_fifo("out", ComputeTile2, ShimTile, buffer_depth, memRef_vec)
 
+        # Buffer
+        buff2 = Buffer(ComputeTile2, [N], T.i32(), "buff2")
+
         # Set up compute tiles
         # Compute tile 2
-        @core(ComputeTile2, "scale.o")
+        @core(ComputeTile2, "ntt_core.o")
         def core_body():
             # Effective while(1)
             for _ in for_(sys.maxsize):
@@ -61,7 +59,7 @@ def my_vector_scalar():
                 # Number of sub-vector "tile" iterations
                 elem_out = of_out.acquire(ObjectFifoPort.Produce, 1)
                 elem_in = of_in.acquire(ObjectFifoPort.Consume, 1)
-                call(scale_vector, [elem_in, elem_out, elem_factor, N])
+                call(ntt_stage0_to_Nminus5, [elem_in, elem_out, elem_factor, N])
                 of_in.release(ObjectFifoPort.Consume, 1)
                 of_out.release(ObjectFifoPort.Produce, 1)
                 of_factor.release(ObjectFifoPort.Consume, 1)

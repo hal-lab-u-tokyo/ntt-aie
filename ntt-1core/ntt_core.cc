@@ -70,4 +70,42 @@ void vector_scalar_mul_vectorized_int32(int32_t *a_in, int32_t *c_out, int32_t *
   scale_vectorized<int32_t>(a_in, c_out, *factor, N);
 }
 
+void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *c_out, int32_t *factor, int32_t N) {
+  // Stage 0
+  for (int k = 0; k < N / 2; k++){
+    int i = 2 * k;
+    int j = i + 1;
+    int32_t v0 = a_in[i];
+    int32_t v1 = a_in[j];
+    a_in[i] = v1;
+    a_in[j] = v0;
+  }
+
+  // Stage 1
+  for (int k = 0; k < N / 2; k++){
+    int i = (k / 2) * 4 + k % 2;
+    int j = i + 2;
+    int32_t v0 = a_in[i];
+    int32_t v1 = a_in[j];
+    a_in[i] = v1;
+    a_in[j] = v0; 
+  }
+
+  // Stage 3
+  for (int k = 0; k < N / 2; k++){
+    int i = (k / 4) * 8 + k % 4;
+    int j = i + 4;
+    int32_t v0 = a_in[i];
+    int32_t v1 = a_in[j];
+    a_in[i] = v1;
+    a_in[j] = v0; 
+  }
+
+  // After Stage 4
+
+  for (int i = 0; i < N; i++){
+    c_out[i] = a_in[i] % *factor;
+  }
+}
+
 } // extern "C"
