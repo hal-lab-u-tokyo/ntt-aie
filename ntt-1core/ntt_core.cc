@@ -79,8 +79,8 @@ void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *c_out, int32_t *prime, int32_
     int j = i + 1;
     int32_t v0 = a_in[i];
     int32_t v1 = a_in[j];
-    //a_in[i] = v1;
-    //a_in[j] = v0;
+    a_in[i] = v0 + v1;
+    a_in[j] = v0 + v1;
   }
 
   // Stage 1
@@ -89,8 +89,8 @@ void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *c_out, int32_t *prime, int32_
     int j = i + 2;
     int32_t v0 = a_in[i];
     int32_t v1 = a_in[j];
-    //a_in[i] = v1;
-    //a_in[j] = v0; 
+    a_in[i] = v0 + v1;
+    a_in[j] = v0 + v1; 
   }
 
   // Stage 3
@@ -99,27 +99,24 @@ void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *c_out, int32_t *prime, int32_
     int j = i + 4;
     int32_t v0 = a_in[i];
     int32_t v1 = a_in[j];
-    //a_in[i] = v1;
-    //a_in[j] = v0; 
+    a_in[i] = v0 + v1;
+    a_in[j] = v0 + v1; 
   }
-
   // Stage 4 to Stage N-1
   constexpr int vec_prime = 8;
   const int F = N_half / vec_prime;
   int bf_width = 8;
-  
-  for (int t = 0; t < logN - 3; t++){
-    int32_t *__restrict pA1 = a_in;
-    for (int i = 0; i < F; i++)
-      chess_prepare_for_pipelining chess_loop_range(16, ) {
-        aie::vector<int32_t, vec_prime> v0 = aie::load_v<vec_prime>(pA1);
-        pA1 += bf_width;
-        aie::vector<int32_t, vec_prime> v1 = aie::load_v<vec_prime>(pA1);
-        aie::vector<int32_t, vec_prime> cout = aie::add(v0, v1);
-        aie::store_v(pA1, cout);
-        pA1 -= bf_width;
-        aie::store_v(pA1, cout);
-        pA1 += vec_prime;
+  int32_t *__restrict pA1 = a_in;
+    
+  for (int stage = 0; stage < logN - 3; stage++){
+    for (int i = 0; i < F; i++){
+        int32_t cycle = bf_width / vec_prime;
+        int32_t *__restrict pA1_i = pA1 + (i / cycle) * bf_width * 2 + (i % cycle) * vec_prime;
+        aie::vector<int32_t, vec_prime> v0 = aie::load_v<vec_prime>(pA1_i);
+        aie::vector<int32_t, vec_prime> v1 = aie::load_v<vec_prime>(pA1_i + bf_width);
+        aie::vector<int32_t, vec_prime> v2 = aie::add(v0, v1);
+        aie::store_v(pA1_i, v2);
+        aie::store_v(pA1_i + bf_width, v2);
     }
     bf_width *= 2;
   }

@@ -43,11 +43,14 @@ void ntt(std::vector<uint64_t> &a, uint64_t n,
             j2 = j1 + t - 1;
             for (int j = j1; j <= j2; j++) {
                 std::cout << j << ", " << j + t << ", root=" << h + i << std::endl;
-                uint64_t root = roots_rev[h + i];
+                //uint64_t root = roots_rev[h + i];
                 uint64_t v0 = a[j];
                 uint64_t v1 = a[j + t];
-                a[j] = (v0 + v1) % p;
-                a[j + t] = (((v0 - v1 + p) % p) * root) % p;
+                a[j] = v0 + v1;
+                a[j + t] = v0 + v1;
+                //uint64_t v1 = a[j + t];
+                //a[j] = (v0 + v1) % p;
+                //a[j + t] = (((v0 - v1 + p) % p) * root) % p;
             }
             j1 += 2 * t;
         }
@@ -66,11 +69,14 @@ void intt(std::vector<uint64_t> &a, uint64_t n, std::vector<uint64_t> &roots_rev
             j2 = j1 + t - 1;
             for (int j = j1; j <= j2; j++) {
                 //std::cout << j << ", " << j + t << ", root=" << m + i << std::endl;
-                uint64_t root = roots_rev[m + i];
+                //uint64_t root = roots_rev[m + i];
                 uint64_t v0 = a[j];
-                uint64_t v1 = (a[j + t] * root) % p;
-                a[j] = (v0 + v1) % p;
-                a[j + t] = (v0 - v1 + p) % p;
+                uint64_t v1 = a[j + t];
+                a[j] = v0 + v1;
+                a[j + t] = v0 + v1;
+                //uint64_t v1 = (a[j + t] * root) % p;
+                //a[j] = (v0 + v1) % p;
+                //a[j + t] = (v0 - v1 + p) % p;
             }
         }
     }
@@ -84,9 +90,9 @@ void intt(std::vector<uint64_t> &a, uint64_t n, std::vector<uint64_t> &roots_rev
 */
 void debug_vector(std::vector<uint64_t> &poly) {
     for (uint64_t e : poly) {
-        std::cout << e << " ";
+        std::cout << e << std::endl;
     }
-    std::cout << std::endl;
+    //std::cout << std::endl;
 }
 
 void is_equal_polynomial(std::vector<uint64_t> &a, std::vector<uint64_t> &b) {
@@ -105,7 +111,7 @@ void is_equal_polynomial(std::vector<uint64_t> &a, std::vector<uint64_t> &b) {
 int main() {
     std::cout << "DFT" << std::endl;
     // Parameters
-    uint64_t n = 1 << 4;
+    uint64_t n = 1 << 5;
     uint64_t p = 998244353;
     uint64_t g = 3;
 
@@ -155,9 +161,9 @@ int main() {
     ntt(a, n, roots, p);
     debug_vector(a);
 
-    std::cout << "========= intt ============" << std::endl;
-    intt(a, n, invroots, p, n_inv);
-    debug_vector(a);
+    //std::cout << "========= intt ============" << std::endl;
+    //intt(a, n, invroots, p, n_inv);
+    //debug_vector(a);
 
-    is_equal_polynomial(input, a);
+    //is_equal_polynomial(input, a);
 }

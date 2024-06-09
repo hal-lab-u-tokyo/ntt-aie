@@ -38,6 +38,9 @@ else
 	cp _build/${targetname} $@ 
 endif 
 
+host: ntt_on_cpu.cc
+	g++ -o host $<
+
 run: ${targetname}.exe build/final.xclbin build/insts.txt 
 	${powershell} ./$< -x build/final.xclbin -i build/insts.txt -k MLIR_AIE
 
