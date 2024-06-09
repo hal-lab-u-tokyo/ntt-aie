@@ -12,6 +12,7 @@
 #include <fstream>
 #include <iostream>
 #include <sstream>
+#include <vector>
 
 #include "test_utils.h"
 #include "xrt/xrt_bo.h"
@@ -19,6 +20,27 @@
 const int scaleFactor = 2;
 
 namespace po = boost::program_options;
+
+uint32_t modPow(uint32_t x, uint32_t n, uint32_t mod) {
+    uint32_t ret;
+    if (n == 0) {
+        ret = 1;
+    } else if (n % 2 == 1) {
+        ret = (x * modPow((x * x) % mod, n / 2, mod)) % mod;
+    } else {
+        ret = modPow((x * x) % mod, n / 2, mod);
+    }
+    return ret;
+}
+
+void make_roots(int32_t n, std::vector<int32_t> &roots){
+  uint32_t p = 998244353;
+  uint32_t g = 3;
+  uint32_t w = modPow(g, (p - 1) / n, p);
+  for (int i = 1; i < n; i++) {
+        roots[i] = (roots[i - 1] * w) % p;
+  }
+}
 
 int main(int argc, const char *argv[]) {
 
@@ -54,14 +76,11 @@ int main(int argc, const char *argv[]) {
                                    vm["kernel"].as<std::string>());
 
   // set up the buffer objects
-  auto bo_instr = xrt::bo(device, instr_v.size() * sizeof(int),
-                          XCL_BO_FLAGS_CACHEABLE, kernel.group_id(0));
-  auto bo_inA =
-      xrt::bo(device, IN_SIZE, XRT_BO_FLAGS_HOST_ONLY, kernel.group_id(2));
-  auto bo_inFactor = xrt::bo(device, 1 * sizeof(int32_t),
-                             XRT_BO_FLAGS_HOST_ONLY, kernel.group_id(3));
-  auto bo_outC =
-      xrt::bo(device, OUT_SIZE, XRT_BO_FLAGS_HOST_ONLY, kernel.group_id(4));
+  auto bo_instr = xrt::bo(device, instr_v.size() * sizeof(int), XCL_BO_FLAGS_CACHEABLE, kernel.group_id(0));
+  auto bo_inA = xrt::bo(device, IN_SIZE, XRT_BO_FLAGS_HOST_ONLY, kernel.group_id(2));
+  auto bo_root = xrt::bo(device, IN_SIZE, XRT_BO_FLAGS_HOST_ONLY, kernel.group_id(3));
+  auto bo_prime = xrt::bo(device, 1 * sizeof(int32_t), XRT_BO_FLAGS_HOST_ONLY, kernel.group_id(4));
+  auto bo_outC = xrt::bo(device, OUT_SIZE, XRT_BO_FLAGS_HOST_ONLY, kernel.group_id(5));
 
   if (verbosity >= 1)
     std::cout << "Writing data into buffer objects.\n";
@@ -70,29 +89,33 @@ int main(int argc, const char *argv[]) {
   void *bufInstr = bo_instr.map<void *>();
   memcpy(bufInstr, instr_v.data(), instr_v.size() * sizeof(int));
 
-  // Initialize buffer bo_inA
+  // Initialize root
+  std::vector<int32_t> root(IN_VOLUME);
+  make_roots(IN_VOLUME, root);
+  
+  // Initialize buffer
   int32_t *bufInA = bo_inA.map<int32_t *>();
-  for (int i = 0; i < IN_VOLUME; i++)
-    bufInA[i] = i + 1;
-
-  // Initialize buffer bo_inFactor
-  int32_t *bufInFactor = bo_inFactor.map<int32_t *>();
-  *bufInFactor = (int32_t)scaleFactor;
-
-  // Zero out buffer bo_outC
+  int32_t *bufRoot = bo_root.map<int32_t *>();
+  int32_t *bufInFactor = bo_prime.map<int32_t *>();
   int32_t *bufOut = bo_outC.map<int32_t *>();
-  memset(bufOut, 0, OUT_SIZE);
+  for (int i = 0; i < IN_VOLUME; i++){
+    bufInA[i] = i + 1;
+    bufRoot[i] = root[i];
+    bufOut[i] = 0;
+  }
+  *bufInFactor = (int32_t)scaleFactor;
 
   // sync host to device memories
   bo_instr.sync(XCL_BO_SYNC_BO_TO_DEVICE);
   bo_inA.sync(XCL_BO_SYNC_BO_TO_DEVICE);
-  bo_inFactor.sync(XCL_BO_SYNC_BO_TO_DEVICE);
+  bo_root.sync(XCL_BO_SYNC_BO_TO_DEVICE);
+  // bo_prime.sync(XCL_BO_SYNC_BO_TO_DEVICE);
   bo_outC.sync(XCL_BO_SYNC_BO_TO_DEVICE);
 
   // Execute the kernel and wait to finish
   if (verbosity >= 1)
     std::cout << "Running Kernel.\n";
-  auto run = kernel(bo_instr, instr_v.size(), bo_inA, bo_inFactor, bo_outC);
+  auto run = kernel(bo_instr, instr_v.size(), bo_inA, bo_root, bo_outC);
   run.wait();
 
   // Sync device to host memories

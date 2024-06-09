@@ -70,7 +70,7 @@ void vector_scalar_mul_vectorized_int32(int32_t *a_in, int32_t *c_out, int32_t *
   scale_vectorized<int32_t>(a_in, c_out, *prime, N);
 }
 
-void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *c_out, int32_t *prime, int32_t N, int32_t logN) {
+void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *c_out, int32_t N, int32_t logN) {
   const int N_half = N / 2;
 
   // Stage 0
