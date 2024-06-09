@@ -70,7 +70,7 @@ void vector_scalar_mul_vectorized_int32(int32_t *a_in, int32_t *c_out, int32_t *
   scale_vectorized<int32_t>(a_in, c_out, *prime, N);
 }
 
-void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *c_out, int32_t *prime, int32_t N) {
+void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *c_out, int32_t *prime, int32_t N, int32_t logN) {
   const int N_half = N / 2;
 
   // Stage 0
@@ -103,21 +103,25 @@ void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *c_out, int32_t *prime, int32_
     //a_in[j] = v0; 
   }
 
-  // After Stage 4
+  // Stage 4 to Stage N-1
   constexpr int vec_prime = 8;
-  int32_t *__restrict pA1 = a_in;
   const int F = N_half / vec_prime;
-  for (int i = 0; i < F; i++)
-    chess_prepare_for_pipelining chess_loop_range(16, ) {
-      aie::vector<int32_t, vec_prime> v0 = aie::load_v<vec_prime>(pA1);
-      pA1 += vec_prime;
-      aie::vector<int32_t, vec_prime> v1 = aie::load_v<vec_prime>(pA1);
-      aie::vector<int32_t, vec_prime> cout = aie::add(v0, v1);
-      pA1 -= vec_prime;
-      aie::store_v(pA1, cout);
-      pA1 += vec_prime;
-      aie::store_v(pA1, cout);
-      pA1 += vec_prime;
+  int bf_width = 8;
+  
+  for (int t = 0; t < logN - 3; t++){
+    int32_t *__restrict pA1 = a_in;
+    for (int i = 0; i < F; i++)
+      chess_prepare_for_pipelining chess_loop_range(16, ) {
+        aie::vector<int32_t, vec_prime> v0 = aie::load_v<vec_prime>(pA1);
+        pA1 += bf_width;
+        aie::vector<int32_t, vec_prime> v1 = aie::load_v<vec_prime>(pA1);
+        aie::vector<int32_t, vec_prime> cout = aie::add(v0, v1);
+        aie::store_v(pA1, cout);
+        pA1 -= bf_width;
+        aie::store_v(pA1, cout);
+        pA1 += vec_prime;
+    }
+    bf_width *= 2;
   }
 
   for (int i = 0; i < N; i++){

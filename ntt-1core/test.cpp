@@ -32,7 +32,7 @@ int main(int argc, const char *argv[]) {
   int trace_size = vm["trace_sz"].as<int>();
 
   constexpr bool VERIFY = true;
-  constexpr int IN_VOLUME = 16;
+  constexpr int IN_VOLUME = 32;
   constexpr int OUT_VOLUME = IN_VOLUME;
 
   int IN_SIZE = IN_VOLUME * sizeof(int32_t);

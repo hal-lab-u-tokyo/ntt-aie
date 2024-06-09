@@ -18,7 +18,8 @@ import aie.utils.trace as trace_utils
 
 
 def my_vector_scalar():
-    N = 16
+    logN = 5
+    N = 1 << logN
     N_div_n = 4  # chop input vector into 4 sub-vectors
     n = N // N_div_n
 
@@ -32,7 +33,7 @@ def my_vector_scalar():
         # AIE Core Function declarations
         ntt_stage0_to_Nminus5 = external_func(
             "ntt_stage0_to_Nminus5",
-            inputs=[memRef_vec, memRef_vec, memRef_scalar, T.i32()],
+            inputs=[memRef_vec, memRef_vec, memRef_scalar, T.i32(), T.i32()],
         )
 
         # Tile declarations
@@ -59,7 +60,7 @@ def my_vector_scalar():
                 # Number of sub-vector "tile" iterations
                 elem_out = of_out.acquire(ObjectFifoPort.Produce, 1)
                 elem_in = of_in.acquire(ObjectFifoPort.Consume, 1)
-                call(ntt_stage0_to_Nminus5, [elem_in, elem_out, elem_prime, N])
+                call(ntt_stage0_to_Nminus5, [elem_in, elem_out, elem_prime, N, logN])
                 of_in.release(ObjectFifoPort.Consume, 1)
                 of_out.release(ObjectFifoPort.Produce, 1)
                 of_prime.release(ObjectFifoPort.Consume, 1)
