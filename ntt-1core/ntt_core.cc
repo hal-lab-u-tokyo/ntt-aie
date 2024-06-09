@@ -70,8 +70,9 @@ void vector_scalar_mul_vectorized_int32(int32_t *a_in, int32_t *c_out, int32_t *
   scale_vectorized<int32_t>(a_in, c_out, *prime, N);
 }
 
-void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *c_out, int32_t N, int32_t logN) {
+void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *root_in, int32_t *c_out, int32_t N, int32_t logN, int32_t p) {
   const int N_half = N / 2;
+  int root_idx = N_half;
 
   // Stage 0
   for (int k = 0; k < N_half; k++){
@@ -79,9 +80,11 @@ void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *c_out, int32_t N, int32_t log
     int j = i + 1;
     int32_t v0 = a_in[i];
     int32_t v1 = a_in[j];
-    a_in[i] = v0 + v1;
-    a_in[j] = v0 + v1;
+    int32_t root = root_in[root_idx + k];
+    a_in[i] = (v0 + v1) % p;
+    a_in[j] = ((v0 - v1 + p) * root) % p;
   }
+  root_idx /= 2;
 
   // Stage 1
   for (int k = 0; k < N_half; k++){
@@ -89,9 +92,11 @@ void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *c_out, int32_t N, int32_t log
     int j = i + 2;
     int32_t v0 = a_in[i];
     int32_t v1 = a_in[j];
-    a_in[i] = v0 + v1;
-    a_in[j] = v0 + v1; 
+    int32_t root = root_in[root_idx + k / 2];
+    a_in[i] = (v0 + v1) % p;
+    a_in[j] = ((v0 - v1 + p) * root) % p;
   }
+  root_idx /= 2;
 
   // Stage 3
   for (int k = 0; k < N_half; k++){
@@ -99,9 +104,12 @@ void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *c_out, int32_t N, int32_t log
     int j = i + 4;
     int32_t v0 = a_in[i];
     int32_t v1 = a_in[j];
-    a_in[i] = v0 + v1;
-    a_in[j] = v0 + v1; 
+    int32_t root = root_in[root_idx + k / 4];
+    a_in[i] = (v0 + v1) % p;
+    a_in[j] = ((v0 - v1 + p) * root) % p;
   }
+  root_idx /= 2;
+
   // Stage 4 to Stage N-1
   constexpr int vec_prime = 8;
   const int F = N_half / vec_prime;
@@ -112,13 +120,16 @@ void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *c_out, int32_t N, int32_t log
     for (int i = 0; i < F; i++){
         int32_t cycle = bf_width / vec_prime;
         int32_t *__restrict pA1_i = pA1 + (i / cycle) * bf_width * 2 + (i % cycle) * vec_prime;
+        int32_t root = root_in[root_idx + i];
         aie::vector<int32_t, vec_prime> v0 = aie::load_v<vec_prime>(pA1_i);
         aie::vector<int32_t, vec_prime> v1 = aie::load_v<vec_prime>(pA1_i + bf_width);
         aie::vector<int32_t, vec_prime> v2 = aie::add(v0, v1);
+        aie::accum<acc64, vec_prime> v2_mul = aie::mul(v2, root);
         aie::store_v(pA1_i, v2);
-        aie::store_v(pA1_i + bf_width, v2);
+        aie::store_v(pA1_i + bf_width, v2_mul.template to_vector<int32_t>(0));
     }
     bf_width *= 2;
+    root_idx /= 2;
   }
 
   for (int i = 0; i < N; i++){

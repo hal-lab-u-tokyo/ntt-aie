@@ -43,14 +43,11 @@ void ntt(std::vector<uint64_t> &a, uint64_t n,
             j2 = j1 + t - 1;
             for (int j = j1; j <= j2; j++) {
                 std::cout << j << ", " << j + t << ", root=" << h + i << std::endl;
-                //uint64_t root = roots_rev[h + i];
+                uint64_t root = roots_rev[h + i];
                 uint64_t v0 = a[j];
                 uint64_t v1 = a[j + t];
-                a[j] = v0 + v1;
-                a[j + t] = v0 + v1;
-                //uint64_t v1 = a[j + t];
-                //a[j] = (v0 + v1) % p;
-                //a[j + t] = (((v0 - v1 + p) % p) * root) % p;
+                a[j] = (v0 + v1) % p;
+                a[j + t] = (((v0 - v1 + p) % p) * root) % p;
             }
             j1 += 2 * t;
         }
@@ -113,6 +110,7 @@ int main() {
     // Parameters
     uint64_t n = 1 << 5;
     uint64_t p = 998244353;
+    //uint64_t p = 65537;
     uint64_t g = 3;
 
     uint64_t w = modPow(g, (p - 1) / n, p);

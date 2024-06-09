@@ -22,6 +22,7 @@ def my_vector_scalar():
     N = 1 << logN
     N_div_n = 4  # chop input vector into 4 sub-vectors
     n = N // N_div_n
+    p = 998244353
 
     buffer_depth = 2
 
@@ -33,7 +34,7 @@ def my_vector_scalar():
         # AIE Core Function declarations
         ntt_stage0_to_Nminus5 = external_func(
             "ntt_stage0_to_Nminus5",
-            inputs=[memRef_vec, memRef_vec, T.i32(), T.i32()],
+            inputs=[memRef_vec, memRef_vec, memRef_vec, T.i32(), T.i32(), T.i32()],
         )
 
         # Tile declarations
@@ -59,8 +60,10 @@ def my_vector_scalar():
                 # Number of sub-vector "tile" iterations
                 elem_out = of_out.acquire(ObjectFifoPort.Produce, 1)
                 elem_in = of_in.acquire(ObjectFifoPort.Consume, 1)
-                call(ntt_stage0_to_Nminus5, [elem_in, elem_out, N, logN])
+                elem_root = of_root.acquire(ObjectFifoPort.Consume, 1)
+                call(ntt_stage0_to_Nminus5, [elem_in, elem_root, elem_out, N, logN, p])
                 of_in.release(ObjectFifoPort.Consume, 1)
+                of_root.release(ObjectFifoPort.Consume, 1)
                 of_out.release(ObjectFifoPort.Produce, 1)
                 #of_prime.release(ObjectFifoPort.Consume, 1)
                 yield_([])
