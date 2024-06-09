@@ -18,20 +18,20 @@
 // Vectorized scale template (general case)
 // Assume N is multiple of 16
 template <typename T>
-void scale_vectorized(T *a, T *c, int32_t factor, const int32_t N) {
+void scale_vectorized(T *a, T *c, int32_t prime, const int32_t N) {
   event0();
-  constexpr int vec_factor = 32;
+  constexpr int vec_prime = 32;
   T *__restrict pA1 = a;
   T *__restrict pC1 = c;
-  const int F = N / vec_factor;
-  T fac = factor;
+  const int F = N / vec_prime;
+  T fac = prime;
   for (int i = 0; i < F; i++)
     chess_prepare_for_pipelining chess_loop_range(16, ) {
-      aie::vector<T, vec_factor> A0 = aie::load_v<vec_factor>(pA1);
-      pA1 += vec_factor;
-      aie::accum<acc32, vec_factor> cout = aie::mul(A0, fac);
+      aie::vector<T, vec_prime> A0 = aie::load_v<vec_prime>(pA1);
+      pA1 += vec_prime;
+      aie::accum<acc32, vec_prime> cout = aie::mul(A0, fac);
       aie::store_v(pC1, cout.template to_vector<T>(0));
-      pC1 += vec_factor;
+      pC1 += vec_prime;
     }
   event1();
 }
@@ -40,37 +40,37 @@ void scale_vectorized(T *a, T *c, int32_t factor, const int32_t N) {
 // Vectorized scale template (int32_t case, acc64 used)
 // Assume N is multiple of 16
 template <>
-void scale_vectorized<int32_t>(int32_t *a, int32_t *c, int32_t factor,
+void scale_vectorized<int32_t>(int32_t *a, int32_t *c, int32_t prime,
                                const int32_t N) {
   event0();
-  constexpr int vec_factor = 32;
+  constexpr int vec_prime = 32;
   int32_t *__restrict pA1 = a;
   int32_t *__restrict pC1 = c;
-  const int F = N / vec_factor;
+  const int F = N / vec_prime;
   for (int i = 0; i < F; i++)
     chess_prepare_for_pipelining chess_loop_range(16, ) {
-      aie::vector<int32_t, vec_factor> A0 = aie::load_v<vec_factor>(pA1);
-      pA1 += vec_factor;
-      aie::accum<acc64, vec_factor> cout = aie::mul(A0, factor);
+      aie::vector<int32_t, vec_prime> A0 = aie::load_v<vec_prime>(pA1);
+      pA1 += vec_prime;
+      aie::accum<acc64, vec_prime> cout = aie::mul(A0, prime);
       aie::store_v(pC1, cout.template to_vector<int32_t>(0));
-      pC1 += vec_factor;
+      pC1 += vec_prime;
     }
   event1();
 }
 
 extern "C" {
 
-void vector_scalar_mul_scalar(int32_t *a, int32_t *c, int32_t *factor, int32_t N) {
+void vector_scalar_mul_scalar(int32_t *a, int32_t *c, int32_t *prime, int32_t N) {
   for (int i = 0; i < N; i++) {
-    c[i] = *factor * a[i];
+    c[i] = *prime * a[i];
   }
 }
 
-void vector_scalar_mul_vectorized_int32(int32_t *a_in, int32_t *c_out, int32_t *factor, int32_t N) {
-  scale_vectorized<int32_t>(a_in, c_out, *factor, N);
+void vector_scalar_mul_vectorized_int32(int32_t *a_in, int32_t *c_out, int32_t *prime, int32_t N) {
+  scale_vectorized<int32_t>(a_in, c_out, *prime, N);
 }
 
-void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *c_out, int32_t *factor, int32_t N) {
+void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *c_out, int32_t *prime, int32_t N) {
   // Stage 0
   for (int k = 0; k < N / 2; k++){
     int i = 2 * k;
@@ -104,7 +104,7 @@ void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *c_out, int32_t *factor, int32
   // After Stage 4
 
   for (int i = 0; i < N; i++){
-    c_out[i] = a_in[i] % *factor;
+    c_out[i] = a_in[i] % *prime;
   }
 }
 

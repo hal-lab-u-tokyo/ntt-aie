@@ -41,8 +41,8 @@ def my_vector_scalar():
 
         # AIE-array data movement with object fifos
         of_in = object_fifo("in", ShimTile, ComputeTile2, buffer_depth, memRef_vec)
-        of_factor = object_fifo(
-            "infactor", ShimTile, ComputeTile2, buffer_depth, memRef_scalar
+        of_prime = object_fifo(
+            "inprime", ShimTile, ComputeTile2, buffer_depth, memRef_scalar
         )
         of_out = object_fifo("out", ComputeTile2, ShimTile, buffer_depth, memRef_vec)
 
@@ -55,14 +55,14 @@ def my_vector_scalar():
         def core_body():
             # Effective while(1)
             for _ in for_(sys.maxsize):
-                elem_factor = of_factor.acquire(ObjectFifoPort.Consume, 1)
+                elem_prime = of_prime.acquire(ObjectFifoPort.Consume, 1)
                 # Number of sub-vector "tile" iterations
                 elem_out = of_out.acquire(ObjectFifoPort.Produce, 1)
                 elem_in = of_in.acquire(ObjectFifoPort.Consume, 1)
-                call(ntt_stage0_to_Nminus5, [elem_in, elem_out, elem_factor, N])
+                call(ntt_stage0_to_Nminus5, [elem_in, elem_out, elem_prime, N])
                 of_in.release(ObjectFifoPort.Consume, 1)
                 of_out.release(ObjectFifoPort.Produce, 1)
-                of_factor.release(ObjectFifoPort.Consume, 1)
+                of_prime.release(ObjectFifoPort.Consume, 1)
                 yield_([])
 
         # To/from AIE-array data movement
@@ -70,7 +70,7 @@ def my_vector_scalar():
         def sequence(A, F, C):
             npu_dma_memcpy_nd(metadata="out", bd_id=0, mem=C, sizes=[1, 1, 1, N])
             npu_dma_memcpy_nd(metadata="in", bd_id=1, mem=A, sizes=[1, 1, 1, N])
-            npu_dma_memcpy_nd(metadata="infactor", bd_id=2, mem=F, sizes=[1, 1, 1, 1])
+            npu_dma_memcpy_nd(metadata="inprime", bd_id=2, mem=F, sizes=[1, 1, 1, 1])
             npu_sync(column=0, row=0, direction=0, channel=0)
 
 
