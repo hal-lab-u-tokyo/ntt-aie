@@ -16,12 +16,7 @@
 #include "test_utils.h"
 #include "xrt/xrt_bo.h"
 
-#ifndef DATATYPES_USING_DEFINED
-#define DATATYPES_USING_DEFINED
-using DATATYPE = std::uint32_t; // Configure this to match your buffer data type
-#endif
-
-const int scaleFactor = 3;
+const int scaleFactor = 2;
 
 namespace po = boost::program_options;
 
@@ -34,10 +29,14 @@ int main(int argc, const char *argv[]) {
 
   test_utils::parse_options(argc, argv, desc, vm);
   int verbosity = vm["verbosity"].as<int>();
+  int trace_size = vm["trace_sz"].as<int>();
 
   constexpr bool VERIFY = true;
-  constexpr int IN_SIZE = 16;
-  constexpr int OUT_SIZE = IN_SIZE;
+  constexpr int IN_VOLUME = 1024;
+  constexpr int OUT_VOLUME = IN_VOLUME;
+
+  int IN_SIZE = IN_VOLUME * sizeof(int32_t);
+  int OUT_SIZE = OUT_VOLUME * sizeof(int32_t) + trace_size;
 
   // Load instruction sequence
   std::vector<uint32_t> instr_v =
@@ -57,12 +56,12 @@ int main(int argc, const char *argv[]) {
   // set up the buffer objects
   auto bo_instr = xrt::bo(device, instr_v.size() * sizeof(int),
                           XCL_BO_FLAGS_CACHEABLE, kernel.group_id(0));
-  auto bo_inA = xrt::bo(device, IN_SIZE * sizeof(DATATYPE),
-                        XRT_BO_FLAGS_HOST_ONLY, kernel.group_id(2));
-  auto bo_inFactor = xrt::bo(device, 1 * sizeof(DATATYPE),
+  auto bo_inA =
+      xrt::bo(device, IN_SIZE, XRT_BO_FLAGS_HOST_ONLY, kernel.group_id(2));
+  auto bo_inFactor = xrt::bo(device, 1 * sizeof(int32_t),
                              XRT_BO_FLAGS_HOST_ONLY, kernel.group_id(3));
-  auto bo_outC = xrt::bo(device, OUT_SIZE * sizeof(DATATYPE),
-                         XRT_BO_FLAGS_HOST_ONLY, kernel.group_id(4));
+  auto bo_outC =
+      xrt::bo(device, OUT_SIZE, XRT_BO_FLAGS_HOST_ONLY, kernel.group_id(4));
 
   if (verbosity >= 1)
     std::cout << "Writing data into buffer objects.\n";
@@ -72,17 +71,17 @@ int main(int argc, const char *argv[]) {
   memcpy(bufInstr, instr_v.data(), instr_v.size() * sizeof(int));
 
   // Initialize buffer bo_inA
-  DATATYPE *bufInA = bo_inA.map<DATATYPE *>();
-  for (int i = 0; i < IN_SIZE; i++)
+  int32_t *bufInA = bo_inA.map<int32_t *>();
+  for (int i = 0; i < IN_VOLUME; i++)
     bufInA[i] = i + 1;
 
   // Initialize buffer bo_inFactor
-  DATATYPE *bufInFactor = bo_inFactor.map<DATATYPE *>();
-  *bufInFactor = scaleFactor;
+  int32_t *bufInFactor = bo_inFactor.map<int32_t *>();
+  *bufInFactor = (int32_t)scaleFactor;
 
   // Zero out buffer bo_outC
-  DATATYPE *bufOut = bo_outC.map<DATATYPE *>();
-  memset(bufOut, 0, OUT_SIZE * sizeof(DATATYPE));
+  int32_t *bufOut = bo_outC.map<int32_t *>();
+  memset(bufOut, 0, OUT_SIZE);
 
   // sync host to device memories
   bo_instr.sync(XCL_BO_SYNC_BO_TO_DEVICE);
@@ -104,7 +103,7 @@ int main(int argc, const char *argv[]) {
   if (verbosity >= 1) {
     std::cout << "Verifying results ..." << std::endl;
   }
-  for (uint32_t i = 0; i < IN_SIZE; i++) {
+  for (uint32_t i = 0; i < IN_VOLUME; i++) {
     int32_t ref = bufInA[i] * scaleFactor;
     int32_t test = bufOut[i];
     if (test != ref) {
@@ -115,6 +114,11 @@ int main(int argc, const char *argv[]) {
       if (verbosity >= 1)
         std::cout << "Correct output " << test << " == " << ref << std::endl;
     }
+  }
+
+  if (trace_size > 0) {
+    test_utils::write_out_trace(((char *)bufOut) + IN_SIZE, trace_size,
+                                vm["trace_file"].as<std::string>());
   }
 
   // Print Pass/Fail result of our test
