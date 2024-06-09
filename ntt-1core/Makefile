@@ -18,11 +18,11 @@ build/aie.mlir: ${srcdir}/aie2.py
 	mkdir -p ${@D}
 	python3 $< > $@
 	
-build/scale.o: ${srcdir}/vector_scalar_mul.cc
+build/ntt_core.o: ${srcdir}/ntt_core.cc
 	mkdir -p ${@D}
 	cd ${@D} && xchesscc_wrapper ${CHESSCCWRAP2_FLAGS} -c $< -o ${@F}
 
-build/final.xclbin: build/aie.mlir build/scale.o
+build/final.xclbin: build/aie.mlir build/ntt_core.o
 	mkdir -p ${@D}
 	cd ${@D} && aiecc.py --aie-generate-cdo --no-compile-host --xclbin-name=${@F} \
 				--aie-generate-npu --npu-insts-name=insts.txt $(<:%=../%)
