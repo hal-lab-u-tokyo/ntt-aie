@@ -85,9 +85,6 @@ void ntt(std::vector<int64_t> &a, int64_t n,
         }
         t <<= 1;
         idx += 1;
-        if (idx == 3){
-            break;
-        }
     }
 }
 

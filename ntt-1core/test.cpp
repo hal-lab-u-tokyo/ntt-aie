@@ -128,12 +128,23 @@ int main(int argc, const char *argv[]) {
   bo_outC.sync(XCL_BO_SYNC_BO_FROM_DEVICE);
 
   // Compare out to golden
+  std::ifstream ansFile("../ans.txt");
+  if (!ansFile) {
+      std::cerr << "Error opening file" << std::endl;
+      return 1;
+  }
+  std::vector<int32_t> answers;
+  int ans;
+  while (ansFile >> ans) {
+      answers.push_back(ans);
+  }
+  
   int errors = 0;
   if (verbosity >= 1) {
     std::cout << "Verifying results ..." << std::endl;
   }
   for (int32_t i = 0; i < IN_VOLUME; i++) {
-    int32_t ref = bufInA[i] * scaleFactor;
+    int32_t ref = answers[i];
     int32_t test = bufOut[i];
     if (test != ref) {
       if (verbosity >= 1)
