@@ -58,6 +58,14 @@ void scale_vectorized<int32_t>(int32_t *a, int32_t *c, int32_t prime,
   event1();
 }
 
+int32_t modadd(int32_t a, int32_t b, int32_t q){
+  int ret = a + b;
+  if (ret >= q){
+    return ret - q;
+  }
+  return ret;
+}
+
 int32_t modsub(int32_t a, int32_t b, int32_t q){
   int ret = a + q - b;
   if (ret >= q){
@@ -89,7 +97,7 @@ void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *root_in, int32_t *c_out, int3
     int32_t v0 = a_in[i];
     int32_t v1 = a_in[j];
     int32_t root = root_in[root_idx + k];
-    a_in[i] = v0 + v1;
+    a_in[i] = modadd(v0, v1, p);
     a_in[j] = modsub(v0, v1, p);
   }
   root_idx /= 2;
@@ -100,7 +108,7 @@ void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *root_in, int32_t *c_out, int3
     int32_t v0 = a_in[i];
     int32_t v1 = a_in[j];
     int32_t root = root_in[root_idx + k / 2];
-    a_in[i] = v0 + v1;
+    a_in[i] = modadd(v0, v1, p);
     a_in[j] = modsub(v0, v1, p);
   }
   root_idx /= 2;
@@ -112,11 +120,10 @@ void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *root_in, int32_t *c_out, int3
     int32_t v0 = a_in[i];
     int32_t v1 = a_in[j];
     int32_t root = root_in[root_idx + k / 4];
-    a_in[i] = v0 + v1;
+    a_in[i] = modadd(v0, v1, p);
     a_in[j] = modsub(v0, v1, p);
   }
   root_idx /= 2;
-
   // Stage 4 to Stage N-1
   constexpr int vec_prime = 8;
   const int F = N_half / vec_prime;
@@ -130,17 +137,21 @@ void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *root_in, int32_t *c_out, int3
         int32_t root = root_in[root_idx + i];
         aie::vector<int32_t, vec_prime> v0 = aie::load_v<vec_prime>(pA1_i);
         aie::vector<int32_t, vec_prime> v1 = aie::load_v<vec_prime>(pA1_i + bf_width);
-        // v0 + v1
-        aie::vector<int32_t, vec_prime> v0_add_v1 = aie::add(v0, v1);
-        // modsub(v0, v1, p)
         aie::vector<int32_t, vec_prime> p_vector = aie::broadcast<int32_t, vec_prime>(p);
+        // modadd(v0, v1, p)
+        aie::vector<int32_t, vec_prime> v2 = aie::add(v0, v1);
+        aie::mask<vec_prime> mask_v2_lt_p = aie::lt(v2, p_vector);
+        aie::vector<int32_t, vec_prime> over_v2 = aie::select(p, 0, mask_v2_lt_p);
+        aie::vector<int32_t, vec_prime> modadd = aie::sub(v2, over_v2);
+
+        // modsub(v0, v1, p)
         aie::vector<int32_t, vec_prime> v0_plus_p = aie::add(v0, p_vector);
-        aie::vector<int32_t, vec_prime> v0_plus_p_sub_v1 = aie::sub(v0_plus_p, v1);
-        aie::mask<vec_prime> mask_lt = aie::lt(v0_plus_p_sub_v1, p_vector);
-        aie::vector<int32_t, vec_prime> over = aie::select(p, 0, mask_lt);
-        aie::vector<int32_t, vec_prime> modsub = aie::sub(v0_plus_p_sub_v1, over);
+        aie::vector<int32_t, vec_prime> v3 = aie::sub(v0_plus_p, v1);
+        aie::mask<vec_prime> mask_v3_lt_p = aie::lt(v3, p_vector);
+        aie::vector<int32_t, vec_prime> over_v3 = aie::select(p, 0, mask_v3_lt_p);
+        aie::vector<int32_t, vec_prime> modsub = aie::sub(v3, over_v3);
         
-        aie::store_v(pA1_i, v0_add_v1);
+        aie::store_v(pA1_i, modadd);
         aie::store_v(pA1_i + bf_width, modsub);
         //aie::accum<acc64, vec_prime> v2_mul = aie::mul(v2, root);
         //aie::store_v(pA1_i + bf_width, v2_mul.template to_vector<int32_t>(0));

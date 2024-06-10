@@ -32,6 +32,14 @@ int64_t modPow(int64_t x, int64_t n, int64_t mod) {
     return ret;
 }
 
+int32_t modadd(int32_t a, int32_t b, int32_t q){
+    int32_t ret = a + b;
+    if (ret >= q){
+        return ret - q;
+    }
+    return ret;
+}
+
 int32_t modsub(int32_t a, int32_t b, int32_t q){
     int32_t ret = a - b + q;
     if (ret >= q){
@@ -68,7 +76,7 @@ void ntt(std::vector<int64_t> &a, int64_t n,
                 int64_t root = roots_rev[h + i];
                 int64_t v0 = a[j];
                 int64_t v1 = a[j + t];
-                a[j] = v0 + v1;
+                a[j] = modadd(v0, v1, p);
                 a[j + t] = modsub(v0, v1, p);
                 //a[j] = (v0 + v1) % p;
                 //a[j + t] = barrett_2k((v0 - v1 + p) % p, root, p, w, u);
