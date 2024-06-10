@@ -41,7 +41,7 @@ int32_t modadd(int32_t a, int32_t b, int32_t q){
 }
 
 int32_t modsub(int32_t a, int32_t b, int32_t q){
-    int32_t ret = a - b + q;
+    int32_t ret = a + q - b;
     if (ret >= q){
         return ret - q;
     }
@@ -66,24 +66,28 @@ void ntt(std::vector<int64_t> &a, int64_t n,
           std::vector<int64_t> &roots_rev, int64_t p, int32_t w, int32_t u) {
     int64_t t = 1;
     int64_t j1, j2, h;
+    int idx = 0;
     for (int m = n; m > 1; m >>= 1) {
         j1 = 0;
         h = m / 2;
         for (int i = 0; i < h; i++) {
             j2 = j1 + t - 1;
             for (int j = j1; j <= j2; j++) {
-                std::cout << j << ", " << j + t << ", root=" << h + i << std::endl;
                 int64_t root = roots_rev[h + i];
+                std::cout << j << ", " << j + t << ", root[" << h + i << "]=" << root <<std::endl;
                 int64_t v0 = a[j];
                 int64_t v1 = a[j + t];
                 a[j] = modadd(v0, v1, p);
-                a[j + t] = modsub(v0, v1, p);
-                //a[j] = (v0 + v1) % p;
-                //a[j + t] = barrett_2k((v0 - v1 + p) % p, root, p, w, u);
+                a[j + t] = barrett_2k(modsub(v0, v1, p), root, p, w, u);
+                std::cout << "modsub = " << modsub(v0, v1, p) << std::endl;
             }
             j1 += 2 * t;
         }
         t <<= 1;
+        idx += 1;
+        if (idx == 3){
+            break;
+        }
     }
 }
 

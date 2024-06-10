@@ -21,8 +21,8 @@ const int scaleFactor = 2;
 
 namespace po = boost::program_options;
 
-int32_t modPow(int32_t x, int32_t n, int32_t mod) {
-    int32_t ret;
+int64_t modPow(int64_t x, int64_t n, int64_t mod) {
+    int64_t ret;
     if (n == 0) {
         ret = 1;
     } else if (n % 2 == 1) {
@@ -34,11 +34,11 @@ int32_t modPow(int32_t x, int32_t n, int32_t mod) {
 }
 
 void make_roots(int32_t n, std::vector<int32_t> &roots){
-  int32_t p = 998244353;
-  int32_t g = 3;
-  int32_t w = modPow(g, (p - 1) / n, p);
+  int64_t p = 998244353;
+  int64_t g = 3;
+  int64_t w = modPow(g, (p - 1) / n, p);
   for (int i = 1; i < n; i++) {
-        roots[i] = (roots[i - 1] * w) % p;
+        roots[i] = (uint32_t)(((uint64_t)roots[i - 1] * w) % p);
   }
 }
 
@@ -91,7 +91,13 @@ int main(int argc, const char *argv[]) {
 
   // Initialize root
   std::vector<int32_t> root(IN_VOLUME);
+  root[0] = 1;
   make_roots(IN_VOLUME, root);
+  std::cout << "roots: ";
+  for (int i = 16; i < IN_VOLUME; i++){
+      std::cout << root[i] << " ";
+  }
+  std::cout << std::endl;
   
   // Initialize buffer
   int32_t *bufInA = bo_inA.map<int32_t *>();

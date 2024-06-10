@@ -74,6 +74,20 @@ int32_t modsub(int32_t a, int32_t b, int32_t q){
   return ret;
 }
 
+int32_t barrett_2k(int32_t a, int32_t b, int32_t q, int32_t w, int32_t u){
+	int64_t t = (int64_t)a *(int64_t) b;
+	int64_t x_1 = t >> (w - 2);
+	int64_t x_2 = u * x_1;
+	int64_t s = x_2 >> (w + 2);
+	int64_t r = s * q;
+	int64_t c = t - r;
+	if (c >= q) {
+		return c - q;
+	}else {
+		return c;
+	}
+}
+
 extern "C" {
 
 void vector_scalar_mul_scalar(int32_t *a, int32_t *c, int32_t *prime, int32_t N) {
@@ -86,7 +100,7 @@ void vector_scalar_mul_vectorized_int32(int32_t *a_in, int32_t *c_out, int32_t *
   scale_vectorized<int32_t>(a_in, c_out, *prime, N);
 }
 
-void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *root_in, int32_t *c_out, int32_t N, int32_t logN, int32_t p) {
+void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *root_in, int32_t *c_out, int32_t N, int32_t logN, int32_t p, int32_t w, int32_t u) {
   const int N_half = N / 2;
   int root_idx = N_half;
 
@@ -98,7 +112,7 @@ void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *root_in, int32_t *c_out, int3
     int32_t v1 = a_in[j];
     int32_t root = root_in[root_idx + k];
     a_in[i] = modadd(v0, v1, p);
-    a_in[j] = modsub(v0, v1, p);
+    a_in[j] = barrett_2k(modsub(v0, v1, p), root, p, w, u);
   }
   root_idx /= 2;
   // Stage 1
@@ -109,7 +123,7 @@ void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *root_in, int32_t *c_out, int3
     int32_t v1 = a_in[j];
     int32_t root = root_in[root_idx + k / 2];
     a_in[i] = modadd(v0, v1, p);
-    a_in[j] = modsub(v0, v1, p);
+    a_in[j] = barrett_2k(modsub(v0, v1, p), root, p, w, u);
   }
   root_idx /= 2;
 
@@ -121,9 +135,10 @@ void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *root_in, int32_t *c_out, int3
     int32_t v1 = a_in[j];
     int32_t root = root_in[root_idx + k / 4];
     a_in[i] = modadd(v0, v1, p);
-    a_in[j] = modsub(v0, v1, p);
+    a_in[j] = barrett_2k(modsub(v0, v1, p), root, p, w, u);
   }
   root_idx /= 2;
+  /*
   // Stage 4 to Stage N-1
   constexpr int vec_prime = 8;
   const int F = N_half / vec_prime;
@@ -159,6 +174,7 @@ void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *root_in, int32_t *c_out, int3
     bf_width *= 2;
     root_idx /= 2;
   }
+  */
   for (int i = 0; i < N; i++){
     c_out[i] = a_in[i];
   }
