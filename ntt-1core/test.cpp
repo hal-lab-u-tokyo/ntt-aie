@@ -64,8 +64,7 @@ int main(int argc, const char *argv[]) {
   std::vector<uint32_t> instr_v =
       test_utils::load_instr_sequence(vm["instr"].as<std::string>());
 
-  if (verbosity >= 1)
-    std::cout << "Sequence instr count: " << instr_v.size() << "\n";
+  std::cout << "Sequence instr count: " << instr_v.size() << "\n";
 
   // Start the XRT context and load the kernel
   xrt::device device;
@@ -82,8 +81,7 @@ int main(int argc, const char *argv[]) {
   auto bo_prime = xrt::bo(device, 1 * sizeof(int32_t), XRT_BO_FLAGS_HOST_ONLY, kernel.group_id(4));
   auto bo_outC = xrt::bo(device, OUT_SIZE, XRT_BO_FLAGS_HOST_ONLY, kernel.group_id(5));
 
-  if (verbosity >= 1)
-    std::cout << "Writing data into buffer objects.\n";
+  std::cout << "Writing data into buffer objects.\n";
 
   // Copy instruction stream to xrt buffer object
   void *bufInstr = bo_instr.map<void *>();
@@ -119,8 +117,7 @@ int main(int argc, const char *argv[]) {
   bo_outC.sync(XCL_BO_SYNC_BO_TO_DEVICE);
 
   // Execute the kernel and wait to finish
-  if (verbosity >= 1)
-    std::cout << "Running Kernel.\n";
+  std::cout << "Running Kernel.\n";
   auto run = kernel(bo_instr, instr_v.size(), bo_inA, bo_root, bo_outC);
   run.wait();
 
@@ -140,19 +137,16 @@ int main(int argc, const char *argv[]) {
   }
   
   int errors = 0;
-  if (verbosity >= 1) {
-    std::cout << "Verifying results ..." << std::endl;
-  }
+  std::cout << "Verifying results ..." << std::endl;
+  
   for (int32_t i = 0; i < IN_VOLUME; i++) {
     int32_t ref = answers[i];
     int32_t test = bufOut[i];
     if (test != ref) {
-      if (verbosity >= 1)
-        std::cout << "Error in output " << test << " != " << ref << std::endl;
+      std::cout << "[" << i << "] Error " << test << " != " << ref << std::endl;
       errors++;
     } else {
-      if (verbosity >= 1)
-        std::cout << "Correct output " << test << " == " << ref << std::endl;
+      std::cout << "[" << i << "] Correct " << test << " == " << ref << std::endl;
     }
   }
 
