@@ -21,8 +21,8 @@ const int scaleFactor = 2;
 
 namespace po = boost::program_options;
 
-uint32_t modPow(uint32_t x, uint32_t n, uint32_t mod) {
-    uint32_t ret;
+int32_t modPow(int32_t x, int32_t n, int32_t mod) {
+    int32_t ret;
     if (n == 0) {
         ret = 1;
     } else if (n % 2 == 1) {
@@ -34,9 +34,9 @@ uint32_t modPow(uint32_t x, uint32_t n, uint32_t mod) {
 }
 
 void make_roots(int32_t n, std::vector<int32_t> &roots){
-  uint32_t p = 998244353;
-  uint32_t g = 3;
-  uint32_t w = modPow(g, (p - 1) / n, p);
+  int32_t p = 998244353;
+  int32_t g = 3;
+  int32_t w = modPow(g, (p - 1) / n, p);
   for (int i = 1; i < n; i++) {
         roots[i] = (roots[i - 1] * w) % p;
   }
@@ -99,7 +99,7 @@ int main(int argc, const char *argv[]) {
   int32_t *bufInFactor = bo_prime.map<int32_t *>();
   int32_t *bufOut = bo_outC.map<int32_t *>();
   for (int i = 0; i < IN_VOLUME; i++){
-    bufInA[i] = i + 1;
+    bufInA[i] = i;
     bufRoot[i] = root[i];
     bufOut[i] = 0;
   }
@@ -126,7 +126,7 @@ int main(int argc, const char *argv[]) {
   if (verbosity >= 1) {
     std::cout << "Verifying results ..." << std::endl;
   }
-  for (uint32_t i = 0; i < IN_VOLUME; i++) {
+  for (int32_t i = 0; i < IN_VOLUME; i++) {
     int32_t ref = bufInA[i] * scaleFactor;
     int32_t test = bufOut[i];
     if (test != ref) {
