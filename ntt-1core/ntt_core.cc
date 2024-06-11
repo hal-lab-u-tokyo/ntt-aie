@@ -189,7 +189,6 @@ void vector_scalar_mul_vectorized_int32(int32_t *a_in, int32_t *c_out, int32_t *
 }
 
 void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *root_in, int32_t *c_out, int32_t N, int32_t logN, int32_t p, int32_t w, int32_t u) {
-  event0();
   const int N_half = N / 2;
   int32_t root_idx = N_half;
   int32_t bf_width = 1;
@@ -198,6 +197,7 @@ void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *root_in, int32_t *c_out, int3
 
 
   // Stage 0
+  event0();
   for (int k = 0; k < N_half; k++){
     int i = 2 * k;
     int j = i + 1;
@@ -207,8 +207,10 @@ void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *root_in, int32_t *c_out, int3
     a_in[i] = modadd(v0, v1, p);
     a_in[j] = barrett_2k(modsub(v0, v1, p), root, p, w, u);
   }
-  
+  event1();
+
   // Stage 1
+  event0();
   bf_width *= 2;
   root_idx /= 2;
   for (int k = 0; k < N_half; k++){
@@ -220,10 +222,12 @@ void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *root_in, int32_t *c_out, int3
     a_in[i] = modadd(v0, v1, p);
     a_in[j] = barrett_2k(modsub(v0, v1, p), root, p, w, u);
   }
+  event1();
 
   int32_t *__restrict pA1 = a_in;
 
   // Stage 2
+  event0();
   bf_width *= 2;
   root_idx /= 2;
   vec_prime = 4;
@@ -238,12 +242,12 @@ void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *root_in, int32_t *c_out, int3
     root_idx /= 2;
     ntt_stage_parallel8(a_in, root_in, bf_width, root_idx, F, p, w, u);     
   }
+  event1();
   
   // Write back
   for (int i = 0; i < N; i++){
     c_out[i] = a_in[i];  
   }
-  event1();
 }
 
 } // extern "C"
