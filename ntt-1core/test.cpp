@@ -44,7 +44,7 @@ void make_roots(int32_t n, std::vector<int32_t> &roots, int64_t p, int64_t g){
 int main(int argc, const char *argv[]) {
   constexpr int64_t p = 3329;
   constexpr int64_t g = 3;
-  constexpr int64_t n = 10;
+  constexpr int64_t n = 6;
   constexpr int64_t trace_size = 8192;
   int IN_VOLUME = 1 << n;
   int OUT_VOLUME = IN_VOLUME + trace_size;

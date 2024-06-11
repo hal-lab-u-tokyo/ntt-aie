@@ -13,7 +13,7 @@ include ${srcdir}/../makefile-common
 all: build/final.xclbin build/insts.txt
 
 targetname = vectorScalar
-trace_size = 8192
+trace_size = 16384
 
 build/aie.mlir: ${srcdir}/aie2.py
 	mkdir -p ${@D}
