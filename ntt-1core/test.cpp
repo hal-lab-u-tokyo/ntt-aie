@@ -9,6 +9,7 @@
 //===----------------------------------------------------------------------===//
 
 #include <cstdint>
+#include <ctime>
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -44,8 +45,9 @@ int main(int argc, const char *argv[]) {
   constexpr int64_t p = 3329;
   constexpr int64_t g = 3;
   constexpr int64_t n = 10;
+  constexpr int64_t trace_size = 8192;
   int IN_VOLUME = 1 << n;
-  int OUT_VOLUME = IN_VOLUME;
+  int OUT_VOLUME = IN_VOLUME + trace_size;
   constexpr bool VERIFY = true;
   
   // Program arguments parsing
@@ -55,7 +57,6 @@ int main(int argc, const char *argv[]) {
 
   test_utils::parse_options(argc, argv, desc, vm);
   int verbosity = vm["verbosity"].as<int>();
-  int trace_size = vm["trace_sz"].as<int>();
 
   int IN_SIZE = IN_VOLUME * sizeof(int32_t);
   int OUT_SIZE = OUT_VOLUME * sizeof(int32_t) + trace_size;
@@ -118,8 +119,14 @@ int main(int argc, const char *argv[]) {
 
   // Execute the kernel and wait to finish
   std::cout << "Running Kernel.\n";
+  auto start = std::chrono::high_resolution_clock::now();
   auto run = kernel(bo_instr, instr_v.size(), bo_inA, bo_root, bo_outC);
-  run.wait();
+  ert_cmd_state r = run.wait();
+  auto stop = std::chrono::high_resolution_clock::now();
+  if (r != ERT_CMD_STATE_COMPLETED) {
+      std::cout << "kernel did not complete. returned status: " << r << "\n";
+      return 1;
+  }
 
   // Sync device to host memories
   bo_outC.sync(XCL_BO_SYNC_BO_FROM_DEVICE);
@@ -155,6 +162,11 @@ int main(int argc, const char *argv[]) {
     test_utils::write_out_trace(((char *)bufOut) + IN_SIZE, trace_size,
                                 vm["trace_file"].as<std::string>());
   }
+
+  float npu_time = std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count();
+  std::cout << std::endl
+            << "Avg NPU NTT time: " << npu_time << "us."
+            << std::endl;
 
   // Print Pass/Fail result of our test
   if (!errors) {

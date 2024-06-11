@@ -21,8 +21,7 @@ import aie.utils.trace as trace_utils
 def my_vector_scalar():
     logN = 10
     N = 1 << logN
-    N_div_n = 4  # chop input vector into 4 sub-vectors
-    n = N // N_div_n
+    N_in_bytes = N * 4
     p = 3329
     barrett_w = math.ceil(math.log2(p))
     barrett_u = math.floor(pow(2, 2 * barrett_w) / p)
@@ -50,6 +49,10 @@ def my_vector_scalar():
         #of_prime = object_fifo("inprime", ShimTile, ComputeTile2, buffer_depth, memRef_scalar)
         of_out = object_fifo("out", ComputeTile2, ShimTile, buffer_depth, memRef_vec)
 
+        # Set up a circuit-switched flow from core to shim for tracing information
+        if trace_size > 0:
+            flow(ComputeTile2, WireBundle.Trace, 0, ShimTile, WireBundle.DMA, 1)
+
         # Buffer
         buff2 = Buffer(ComputeTile2, [N], T.i32(), "buff2")
 
@@ -74,13 +77,21 @@ def my_vector_scalar():
         # To/from AIE-array data movement
         @FuncOp.from_py_func(memRef_vec, memRef_vec, memRef_vec)
         def sequence(A, root, C):
+            if trace_size > 0:
+                trace_utils.configure_simple_tracing_aie2(
+                    ComputeTile2,
+                    ShimTile,
+                    ddr_id=2,
+                    size=trace_size,
+                    offset=N_in_bytes,
+                )
             npu_dma_memcpy_nd(metadata="out", bd_id=0, mem=C, sizes=[1, 1, 1, N])
             npu_dma_memcpy_nd(metadata="in", bd_id=1, mem=A, sizes=[1, 1, 1, N])
             npu_dma_memcpy_nd(metadata="inroot", bd_id=2, mem=root, sizes=[1, 1, 1, N])
             #npu_dma_memcpy_nd(metadata="inprime", bd_id=3, mem=F, sizes=[1, 1, 1, 1])
             npu_sync(column=0, row=0, direction=0, channel=0)
 
-
+trace_size = 0 if (len(sys.argv) != 2) else int(sys.argv[1])
 with mlir_mod_ctx() as ctx:
     my_vector_scalar()
     print(ctx.module)
