@@ -34,7 +34,7 @@ int64_t modPow(int64_t x, int64_t n, int64_t mod) {
 }
 
 void make_roots(int32_t n, std::vector<int32_t> &roots){
-  int64_t p = 998244353;
+  int64_t p = 1097;
   int64_t g = 3;
   int64_t w = modPow(g, (p - 1) / n, p);
   for (int i = 1; i < n; i++) {
@@ -54,7 +54,7 @@ int main(int argc, const char *argv[]) {
   int trace_size = vm["trace_sz"].as<int>();
 
   constexpr bool VERIFY = true;
-  constexpr int IN_VOLUME = 32;
+  constexpr int IN_VOLUME = 64;
   constexpr int OUT_VOLUME = IN_VOLUME;
 
   int IN_SIZE = IN_VOLUME * sizeof(int32_t);
@@ -125,7 +125,7 @@ int main(int argc, const char *argv[]) {
   bo_outC.sync(XCL_BO_SYNC_BO_FROM_DEVICE);
 
   // Compare out to golden
-  std::ifstream ansFile("../ans.txt");
+  std::ifstream ansFile("../data/ans_q1097_n5.txt");
   if (!ansFile) {
       std::cerr << "Error opening file" << std::endl;
       return 1;

@@ -19,11 +19,11 @@ import aie.utils.trace as trace_utils
 
 
 def my_vector_scalar():
-    logN = 5
+    logN = 6
     N = 1 << logN
     N_div_n = 4  # chop input vector into 4 sub-vectors
     n = N // N_div_n
-    p = 998244353
+    p = 1097
     barrett_w = math.ceil(math.log2(p))
     barrett_u = math.floor(pow(2, 2 * barrett_w) / p)
     

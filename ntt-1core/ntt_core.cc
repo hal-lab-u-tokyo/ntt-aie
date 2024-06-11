@@ -144,8 +144,7 @@ void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *root_in, int32_t *c_out, int3
   const int F = N_half / vec_prime;
   int bf_width = 8;
   int32_t *__restrict pA1 = a_in;
-    
-  for (int stage = 0; stage < logN - 3; stage++){
+  for (int stage = 0; stage < 2; stage++){
     for (int i = 0; i < F; i++){
         int32_t cycle = bf_width / vec_prime;
         int32_t *__restrict pA1_i = pA1 + (i / cycle) * bf_width * 2 + (i % cycle) * vec_prime;
@@ -188,7 +187,7 @@ void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *root_in, int32_t *c_out, int3
     bf_width *= 2;
     root_idx /= 2;
   }
-  
+
   for (int i = 0; i < N; i++){
     c_out[i] = a_in[i];
   }
