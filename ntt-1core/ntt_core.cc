@@ -101,6 +101,7 @@ void vector_scalar_mul_vectorized_int32(int32_t *a_in, int32_t *c_out, int32_t *
 }
 
 void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *root_in, int32_t *c_out, int32_t N, int32_t logN, int32_t p, int32_t w, int32_t u) {
+  event0();
   const int N_half = N / 2;
   int root_idx = N_half;
 
@@ -115,6 +116,7 @@ void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *root_in, int32_t *c_out, int3
     a_in[j] = barrett_2k(modsub(v0, v1, p), root, p, w, u);
   }
   root_idx /= 2;
+
   // Stage 1
   for (int k = 0; k < N_half; k++){
     int i = (k / 2) * 4 + k % 2;
@@ -191,6 +193,7 @@ void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *root_in, int32_t *c_out, int3
   for (int i = 0; i < N; i++){
     c_out[i] = a_in[i];
   }
+  event1();
 }
 
 } // extern "C"
