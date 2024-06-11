@@ -54,7 +54,7 @@ int32_t barrett_2k(int32_t a, int32_t b, int32_t q, int32_t w, int32_t u){
 	int64_t x_2 = u * x_1;
 	int64_t s = x_2 >> (w + 2);
 	int64_t r = s * q;
-    std::cout << "log2(t): " << std::log2(t) << ", log2(x_2): " << std::log2(x_2) << ", log2(r): " << std::log2(r) << std::endl;
+    //std::cout << "log2(t): " << std::log2(t) << ", log2(x_2): " << std::log2(x_2) << ", log2(r): " << std::log2(r) << std::endl;
 	int64_t c = t - r;
 	if (c >= q) {
 		return c - q;
@@ -75,7 +75,7 @@ void ntt(std::vector<int64_t> &a, int64_t n,
             j2 = j1 + t - 1;
             for (int j = j1; j <= j2; j++) {
                 int64_t root = roots_rev[h + i];
-                //std::cout << j << ", " << j + t << ", root[" << h + i << "]=" << root <<std::endl;
+                std::cout << j << ", " << j + t << ", root[" << h + i << "]=" << root <<std::endl;
                 int64_t v0 = a[j];
                 int64_t v1 = a[j + t];
                 a[j] = modadd(v0, v1, p);
@@ -85,6 +85,9 @@ void ntt(std::vector<int64_t> &a, int64_t n,
             j1 += 2 * t;
         }
         t <<= 1;
+        if (idx == 4){
+            break;
+        }
         idx += 1;
     }
 }
@@ -190,8 +193,8 @@ int main() {
     debug_vector(a);
 
     //std::cout << "========= intt ============" << std::endl;
-    intt(a, n, invroots, p, n_inv);
-    debug_vector(a);
+    //intt(a, n, invroots, p, n_inv);
+    //debug_vector(a);
 
-    is_equal_polynomial(input, a);
+    //is_equal_polynomial(input, a);
 }
