@@ -144,18 +144,18 @@ void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *root_in, int32_t *c_out, int3
   const int F = N_half / vec_prime;
   int bf_width = 8;
   int32_t *__restrict pA1 = a_in;
-    
   for (int stage = 0; stage < logN - 3; stage++){
     for (int i = 0; i < F; i++){
         int32_t cycle = bf_width / vec_prime;
-        int32_t *__restrict pA1_i = pA1 + (i / cycle) * bf_width * 2 + (i % cycle) * vec_prime;
-        int32_t root = root_in[root_idx + i];
+        int32_t idx_base = (i / cycle) * bf_width * 2 + (i % cycle) * vec_prime;
+        int32_t *__restrict pA1_i = pA1 + idx_base;
+        int32_t root = root_in[root_idx + i / cycle];
         aie::vector<int32_t, vec_prime> v0 = aie::load_v<vec_prime>(pA1_i);
         aie::vector<int32_t, vec_prime> v1 = aie::load_v<vec_prime>(pA1_i + bf_width);
         aie::vector<int32_t, vec_prime> p_vector = aie::broadcast<int32_t, vec_prime>(p);
         aie::vector<int32_t, vec_prime> root_vector = aie::broadcast<int32_t, vec_prime>(root);
         aie::vector<int32_t, vec_prime> u_vector = aie::broadcast<int32_t, vec_prime>(u);
-
+       
         // modadd(v0, v1, p)
         aie::vector<int32_t, vec_prime> v2 = aie::add(v0, v1);
         aie::mask<vec_prime> mask_v2_lt_p = aie::lt(v2, p_vector);
@@ -188,7 +188,6 @@ void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *root_in, int32_t *c_out, int3
     bf_width *= 2;
     root_idx /= 2;
   }
-  
   for (int i = 0; i < N; i++){
     c_out[i] = a_in[i];
   }

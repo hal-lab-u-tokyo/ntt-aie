@@ -13,7 +13,7 @@ void bit_reversal(int64_t n, std::vector<int64_t> &res) {
     int64_t d = n / 2;
     for (int u = 1; u < n; u <<= 1) {
         for (int k = 0; k < u; k++) {
-						std::cout << "(k,u)=(" << k << "," << u << ")" << "res[k]=" << res[k] << ", d=" << d << std::endl;
+			//std::cout << "(k,u)=(" << k << "," << u << ")" << "res[k]=" << res[k] << ", d=" << d << std::endl;
             res[k | u] = res[k] | d;
         }
         d >>= 1;
@@ -54,6 +54,7 @@ int32_t barrett_2k(int32_t a, int32_t b, int32_t q, int32_t w, int32_t u){
 	int64_t x_2 = u * x_1;
 	int64_t s = x_2 >> (w + 2);
 	int64_t r = s * q;
+    //std::cout << "log2(t): " << std::log2(t) << ", log2(x_2): " << std::log2(x_2) << ", log2(r): " << std::log2(r) << std::endl;
 	int64_t c = t - r;
 	if (c >= q) {
 		return c - q;
@@ -79,7 +80,7 @@ void ntt(std::vector<int64_t> &a, int64_t n,
                 int64_t v1 = a[j + t];
                 a[j] = modadd(v0, v1, p);
                 a[j + t] = barrett_2k(modsub(v0, v1, p), root, p, w, u);
-                std::cout << "modsub = " << modsub(v0, v1, p) << std::endl;
+                //std::cout << "modsub = " << modsub(v0, v1, p) << std::endl;
             }
             j1 += 2 * t;
         }
@@ -138,16 +139,17 @@ void is_equal_polynomial(std::vector<int64_t> &a, std::vector<int64_t> &b) {
 int main() {
     std::cout << "DFT" << std::endl;
     // Parameters
-    int64_t n = 1 << 5;
-    int64_t p = 998244353;
+    int64_t n = 1 << 10;
+    //int64_t p = 998244353;
     //int64_t p = 65537;
+    int64_t p = 3329;
+    //int64_t p = 1097;
     int64_t g = 3;
-    int32_t barrett_w = std::ceil(std::log2(p));
-    int32_t barrett_u = std::floor(std::pow(2, 2 * barrett_w) / p);
-
     int64_t w = modPow(g, (p - 1) / n, p);
     int64_t n_inv = modPow(n, p - 2, p);
-    std::cout << "(w, n_inv) = (" << w << ", " << n_inv << ")" << std::endl;
+    int32_t barrett_w = std::ceil(std::log2(p));
+    int32_t barrett_u = std::floor(std::pow(2, 2 * barrett_w) / p);
+    //std::cout << "(w, n_inv) = (" << w << ", " << n_inv << ")" << std::endl;
 
     std::vector<int64_t> roots(n);
     std::vector<int64_t> invroots(n);
@@ -157,10 +159,7 @@ int main() {
     for (int i = 1; i < n; i++) {
         roots[i] = (roots[i - 1] * w) % p;
         invroots[i] = (modPow(roots[i], p - 2, p));
-    }
-   
-    //std::cout << "ROOTS" << std::endl;
-    //debug_vector(roots);
+    }   
 
     // Input
     std::vector<int64_t> input(n, 0);
@@ -170,12 +169,12 @@ int main() {
         a[i] = i;
     }
 
+/*
     std::cout << "INPUT" << std::endl;
     debug_vector(a);
+    std::cout << "ROOTS" << std::endl;
+    debug_vector(roots);
 
-    // The result is bit-reversed order
-    // Use roots_rev and invroots_rev for the correct order
-    /*
     std::vector<int64_t> roots_rev(n);
     std::vector<int64_t> invroots_rev(n);
     std::vector<int64_t> bitrev(n, 0);
@@ -184,8 +183,7 @@ int main() {
         roots_rev[bitrev[i]] = roots[i];
         invroots_rev[bitrev[i]] = invroots[i];
     }
-    */
-
+*/
 
     std::cout << "========= ntt ===========" << std::endl;
     ntt(a, n, roots, p, barrett_w, barrett_u);
@@ -195,5 +193,5 @@ int main() {
     //intt(a, n, invroots, p, n_inv);
     //debug_vector(a);
 
-    //mis_equal_polynomial(input, a);
+    //is_equal_polynomial(input, a);
 }

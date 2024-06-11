@@ -33,9 +33,7 @@ int64_t modPow(int64_t x, int64_t n, int64_t mod) {
     return ret;
 }
 
-void make_roots(int32_t n, std::vector<int32_t> &roots){
-  int64_t p = 998244353;
-  int64_t g = 3;
+void make_roots(int32_t n, std::vector<int32_t> &roots, int64_t p, int64_t g){
   int64_t w = modPow(g, (p - 1) / n, p);
   for (int i = 1; i < n; i++) {
         roots[i] = (uint32_t)(((uint64_t)roots[i - 1] * w) % p);
@@ -43,7 +41,13 @@ void make_roots(int32_t n, std::vector<int32_t> &roots){
 }
 
 int main(int argc, const char *argv[]) {
-
+  constexpr int64_t p = 3329;
+  constexpr int64_t g = 3;
+  constexpr int64_t n = 10;
+  int IN_VOLUME = 1 << n;
+  int OUT_VOLUME = IN_VOLUME;
+  constexpr bool VERIFY = true;
+  
   // Program arguments parsing
   po::options_description desc("Allowed options");
   po::variables_map vm;
@@ -52,10 +56,6 @@ int main(int argc, const char *argv[]) {
   test_utils::parse_options(argc, argv, desc, vm);
   int verbosity = vm["verbosity"].as<int>();
   int trace_size = vm["trace_sz"].as<int>();
-
-  constexpr bool VERIFY = true;
-  constexpr int IN_VOLUME = 32;
-  constexpr int OUT_VOLUME = IN_VOLUME;
 
   int IN_SIZE = IN_VOLUME * sizeof(int32_t);
   int OUT_SIZE = OUT_VOLUME * sizeof(int32_t) + trace_size;
@@ -90,9 +90,9 @@ int main(int argc, const char *argv[]) {
   // Initialize root
   std::vector<int32_t> root(IN_VOLUME);
   root[0] = 1;
-  make_roots(IN_VOLUME, root);
+  make_roots(IN_VOLUME, root, p, g);
   std::cout << "roots: ";
-  for (int i = 16; i < IN_VOLUME; i++){
+  for (int i = IN_VOLUME / 2; i < IN_VOLUME; i++){
       std::cout << root[i] << " ";
   }
   std::cout << std::endl;
@@ -125,7 +125,8 @@ int main(int argc, const char *argv[]) {
   bo_outC.sync(XCL_BO_SYNC_BO_FROM_DEVICE);
 
   // Compare out to golden
-  std::ifstream ansFile("../ans.txt");
+  std::string filename = std::format("../data/ans_q{}_n{}.txt", p, n);
+  std::ifstream ansFile(filename);
   if (!ansFile) {
       std::cerr << "Error opening file" << std::endl;
       return 1;
