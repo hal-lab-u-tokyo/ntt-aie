@@ -150,14 +150,12 @@ void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *root_in, int32_t *c_out, int3
         int32_t idx_base = (i / cycle) * bf_width * 2 + (i % cycle) * vec_prime;
         int32_t *__restrict pA1_i = pA1 + idx_base;
         int32_t root = root_in[root_idx + i / cycle];
-        //int32_t test_value = root_idx + i / cycle;
         aie::vector<int32_t, vec_prime> v0 = aie::load_v<vec_prime>(pA1_i);
         aie::vector<int32_t, vec_prime> v1 = aie::load_v<vec_prime>(pA1_i + bf_width);
         aie::vector<int32_t, vec_prime> p_vector = aie::broadcast<int32_t, vec_prime>(p);
         aie::vector<int32_t, vec_prime> root_vector = aie::broadcast<int32_t, vec_prime>(root);
         aie::vector<int32_t, vec_prime> u_vector = aie::broadcast<int32_t, vec_prime>(u);
-        //aie::vector<int32_t, vec_prime> test_vector = aie::broadcast<int32_t, vec_prime>(test_value);
-
+       
         // modadd(v0, v1, p)
         aie::vector<int32_t, vec_prime> v2 = aie::add(v0, v1);
         aie::mask<vec_prime> mask_v2_lt_p = aie::lt(v2, p_vector);

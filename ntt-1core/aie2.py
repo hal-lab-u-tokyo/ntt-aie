@@ -19,7 +19,7 @@ import aie.utils.trace as trace_utils
 
 
 def my_vector_scalar():
-    logN = 6
+    logN = 10
     N = 1 << logN
     N_div_n = 4  # chop input vector into 4 sub-vectors
     n = N // N_div_n
