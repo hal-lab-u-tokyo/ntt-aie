@@ -17,49 +17,6 @@
 
 #define VEC_NUM 8
 
-// Vectorized scale template (general case)
-// Assume N is multiple of 16
-template <typename T>
-void scale_vectorized(T *a, T *c, int32_t prime, const int32_t N) {
-  event0();
-  constexpr int vec_prime = 32;
-  T *__restrict pA1 = a;
-  T *__restrict pC1 = c;
-  const int F = N / vec_prime;
-  T fac = prime;
-  for (int i = 0; i < F; i++)
-    chess_prepare_for_pipelining chess_loop_range(16, ) {
-      aie::vector<T, vec_prime> A0 = aie::load_v<vec_prime>(pA1);
-      pA1 += vec_prime;
-      aie::accum<acc32, vec_prime> cout = aie::mul(A0, fac);
-      aie::store_v(pC1, cout.template to_vector<T>(0));
-      pC1 += vec_prime;
-    }
-  event1();
-}
-
-
-// Vectorized scale template (int32_t case, acc64 used)
-// Assume N is multiple of 16
-template <>
-void scale_vectorized<int32_t>(int32_t *a, int32_t *c, int32_t prime,
-                               const int32_t N) {
-  event0();
-  constexpr int vec_prime = 32;
-  int32_t *__restrict pA1 = a;
-  int32_t *__restrict pC1 = c;
-  const int F = N / vec_prime;
-  for (int i = 0; i < F; i++)
-    chess_prepare_for_pipelining chess_loop_range(16, ) {
-      aie::vector<int32_t, vec_prime> A0 = aie::load_v<vec_prime>(pA1);
-      pA1 += vec_prime;
-      aie::accum<acc64, vec_prime> cout = aie::mul(A0, prime);
-      aie::store_v(pC1, cout.template to_vector<int32_t>(0));
-      pC1 += vec_prime;
-    }
-  event1();
-}
-
 int32_t modadd(int32_t a, int32_t b, int32_t q){
   int ret = a + b;
   if (ret >= q){
@@ -194,38 +151,56 @@ void ntt_stage_parallel8(int32_t *pA1, int32_t *root_in, int32_t bf_width, int32
 
 extern "C" {
 
-void vector_scalar_mul_scalar(int32_t *a, int32_t *c, int32_t *prime, int32_t N) {
-  for (int i = 0; i < N; i++) {
-    c[i] = *prime * a[i];
-  }
-}
-
-void vector_scalar_mul_vectorized_int32(int32_t *a_in, int32_t *c_out, int32_t *prime, int32_t N) {
-  scale_vectorized<int32_t>(a_in, c_out, *prime, N);
-}
-
 void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *root_in, int32_t *c_out, int32_t N, int32_t logN, int32_t p, int32_t w, int32_t u) {
   const int N_half = N / 2;
   int32_t root_idx = N_half;
   int32_t bf_width = 1;
   int32_t vec_prime = 1;
   int32_t F = N_half / vec_prime;
+  int32_t *__restrict pA1 = a_in;
+  int32_t *__restrict pC = c_out;
 
+  // Mask vector on scalar
+  for (int i = 0; i < N / 2; i++){
+    c_out[i * 2] = 0;
+    c_out[i * 2 + 1] = 1;
+  }
 
-  // Stage 0
+  // Stage 0 on Vector
   event0();
-  // v0
-  // v1 = v0 << 1
-  // vadd = modadd(v0, v1, p)
-  // select idx %2 == 0 from vadd
+  F = N_half / VEC_NUM;
+  aie::vector<int32_t, VEC_NUM> p_vector = aie::broadcast<int32_t, VEC_NUM>(p);     
+  aie::vector<int32_t, VEC_NUM> u_vector = aie::broadcast<int32_t, VEC_NUM>(u);     
+  for (int i = 0; i < F; i++){
+    // v0
+    // v1_left = v0 << 1
+    // v1_right = v0 >> 1
+    int32_t *__restrict pA1_i = pA1 + i * VEC_NUM;
+    int32_t *__restrict pC_i = pC + i * VEC_NUM;
+    aie::vector<int32_t, VEC_NUM> v0 = aie::load_v<VEC_NUM>(pA1_i);
+    aie::vector<int32_t, VEC_NUM> v1_left = aie::shuffle_down(v0, 1);
+    aie::vector<int32_t, VEC_NUM> v1_right = aie::shuffle_up(v0, 1);
+    aie::vector<int32_t, VEC_NUM> mask = aie::load_v<VEC_NUM>(pC_i);
 
-  // vsub = modsub(v0, v1, p)
-  // vsub_root = barrett_2k(modsub(v0, v1, p), root, p, w, u);
-  // select idx %2 == 1 from vsub_root
+    // vadd = modadd(v0, v1_left, p)
+    // select idx %2 == 0 from vadd
+    aie::vector<int32_t, VEC_NUM> vadd = vector_modadd(v0, v1_left, p_vector);
+    aie::mask<VEC_NUM> mask_select_even = aie::eq(mask, 1);
+    aie::vector<int32_t, VEC_NUM> vadd_even = aie::select(vadd, 0, mask_select_even);
 
-  // store 
+    // vsub = modsub(v0, v1_right, p)
+    // vsub_root = barrett_2k(modsub(v0, v1, p), root, p, w, u);
+    // select idx %2 == 1 from vsub_root
+    aie::vector<int32_t, VEC_NUM> vsub = vector_modsub(v0, v1_right, p_vector);
+    //aie::vector<int32_t, VEC_NUM> barrett = vector_barrett(modsub, p_vector, root_vector, u_vector, w);
+    aie::mask<VEC_NUM> mask_select_odd = aie::eq(mask, 0);
+    aie::vector<int32_t, VEC_NUM> barrett_odd = aie::select(barrett, 0, mask_select_odd);
 
-
+    // store
+    aie::vector<int32_t, VEC_NUM> ret = aie::add(vadd_even, barrett_odd);
+    aie::store_v(pA1_i, ret);
+  }
+  
   for (int k = 0; k < N_half; k++){
     int i = 2 * k;
     int j = i + 1;
@@ -251,8 +226,6 @@ void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *root_in, int32_t *c_out, int3
     a_in[j] = barrett_2k(modsub(v0, v1, p), root, p, w, u);
   }
   event1();
-
-  int32_t *__restrict pA1 = a_in;
 
   // Stage 2
   event0();
