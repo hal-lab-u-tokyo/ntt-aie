@@ -152,7 +152,7 @@ void ntt_stage_parallel8(int32_t *pA1, int32_t *root_in, int32_t bf_width, int32
         aie::vector<int32_t, vec_prime> modadd = aie::sub(v2, over_v2);
 
         // modsub(v0, v1, p)
-        aie::vector<int32_t, vec_prime> v0_plus_p = aie::(v0, p_vector);
+        aie::vector<int32_t, vec_prime> v0_plus_p = aie::add(v0, p_vector);
         aie::vector<int32_t, vec_prime> v3 = aie::sub(v0_plus_p, v1);
         aie::mask<vec_prime> mask_v3_lt_p = aie::lt(v3, p_vector);
         aie::vector<int32_t, vec_prime> over_v3 = aie::select(p, 0, mask_v3_lt_p);

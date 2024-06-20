@@ -18,7 +18,7 @@ from aie.extras.dialects.ext import memref, arith
 import aie.utils.trace as trace_utils
 
 
-def my_vector_scalar():
+def ntt():
     logN = 10
     N = 1 << logN
     N_in_bytes = N * 4
@@ -93,5 +93,5 @@ def my_vector_scalar():
 
 trace_size = 0 if (len(sys.argv) != 2) else int(sys.argv[1])
 with mlir_mod_ctx() as ctx:
-    my_vector_scalar()
+    ntt()
     print(ctx.module)
