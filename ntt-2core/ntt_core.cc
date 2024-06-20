@@ -159,6 +159,7 @@ void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *root_in, int32_t *c_out, int3
   int32_t F = N_half / vec_prime;
   int32_t *__restrict pA1 = a_in;
   int32_t *__restrict pC = c_out;
+  int32_t *__restrict pRoot = root_in;
 
   // Mask vector on scalar
   for (int i = 0; i < N / 2; i++){
@@ -177,6 +178,7 @@ void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *root_in, int32_t *c_out, int3
     // v1_right = v0 >> 1
     int32_t *__restrict pA1_i = pA1 + i * VEC_NUM;
     int32_t *__restrict pC_i = pC + i * VEC_NUM;
+    int32_t *__restrict pRoot_i = pRoot + i * VEC_NUM;
     aie::vector<int32_t, VEC_NUM> v0 = aie::load_v<VEC_NUM>(pA1_i);
     aie::vector<int32_t, VEC_NUM> v1_left = aie::shuffle_down(v0, 1);
     aie::vector<int32_t, VEC_NUM> v1_right = aie::shuffle_up(v0, 1);
@@ -192,7 +194,8 @@ void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *root_in, int32_t *c_out, int3
     // vsub_root = barrett_2k(modsub(v0, v1, p), root, p, w, u);
     // select idx %2 == 1 from vsub_root
     aie::vector<int32_t, VEC_NUM> vsub = vector_modsub(v0, v1_right, p_vector);
-    //aie::vector<int32_t, VEC_NUM> barrett = vector_barrett(modsub, p_vector, root_vector, u_vector, w);
+    aie::vector<int32_t, VEC_NUM> root_vector = aie::load_v<VEC_NUM>(pRoot_i);
+    aie::vector<int32_t, VEC_NUM> barrett = vector_barrett(vsub, p_vector, root_vector, u_vector, w);
     aie::mask<VEC_NUM> mask_select_odd = aie::eq(mask, 0);
     aie::vector<int32_t, VEC_NUM> barrett_odd = aie::select(barrett, 0, mask_select_odd);
 
@@ -200,7 +203,7 @@ void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *root_in, int32_t *c_out, int3
     aie::vector<int32_t, VEC_NUM> ret = aie::add(vadd_even, barrett_odd);
     aie::store_v(pA1_i, ret);
   }
-  
+  /*
   for (int k = 0; k < N_half; k++){
     int i = 2 * k;
     int j = i + 1;
@@ -210,6 +213,7 @@ void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *root_in, int32_t *c_out, int3
     a_in[i] = modadd(v0, v1, p);
     a_in[j] = barrett_2k(modsub(v0, v1, p), root, p, w, u);
   }
+  */
   event1();
 
   // Stage 1
