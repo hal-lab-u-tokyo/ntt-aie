@@ -36,7 +36,7 @@ def ntt():
         # AIE Core Function declarations
         ntt_stage0_to_Nminus5 = external_func(
             "ntt_stage0_to_Nminus5",
-            inputs=[memRef_vec, memRef_vec, memRef_vec, T.i32(), T.i32(), T.i32(), T.i32(), T.i32()],
+            inputs=[T.i32(), memRef_vec, memRef_vec, memRef_vec, T.i32(), T.i32(), T.i32(), T.i32(), T.i32()],
         )
 
         # Tile declarations
@@ -67,7 +67,7 @@ def ntt():
                 elem_out = of_out.acquire(ObjectFifoPort.Produce, 1)
                 elem_in = of_in.acquire(ObjectFifoPort.Consume, 1)
                 elem_root = of_root.acquire(ObjectFifoPort.Consume, 1)
-                call(ntt_stage0_to_Nminus5, [elem_in, elem_root, elem_out, N, logN, p, barrett_w, barrett_u])
+                call(ntt_stage0_to_Nminus5, [0, elem_in, elem_root, elem_out, N, logN, p, barrett_w, barrett_u])
                 of_in.release(ObjectFifoPort.Consume, 1)
                 of_root.release(ObjectFifoPort.Consume, 1)
                 of_out.release(ObjectFifoPort.Produce, 1)

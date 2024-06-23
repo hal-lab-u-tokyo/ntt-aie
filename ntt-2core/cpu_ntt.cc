@@ -77,7 +77,7 @@ void ntt(std::vector<int64_t> &a, int64_t n,
             j2 = j1 + t - 1;
             for (int j = j1; j <= j2; j++) {
                 int64_t root = roots_rev[h + i];
-                //std::cout << j << ", " << j + t << ", root[" << h + i << "]=" << root <<std::endl;
+                std::cout << j << ", " << j + t << ", root[" << h + i << "]=" << root <<std::endl;
                 int64_t v0 = a[j];
                 int64_t v1 = a[j + t];
                 a[j] = modadd(v0, v1, p);
@@ -157,7 +157,7 @@ void export_vector_to_file(std::vector<int64_t> &poly, int32_t q, int32_t n){
 int main() {
     std::cout << "DFT" << std::endl;
     // Parameters
-    int32_t logn = 11;
+    int32_t logn = 6;
     int64_t n = 1 << logn;
     //int64_t p = 998244353;
     //int64_t p = 65537;
