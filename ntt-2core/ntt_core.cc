@@ -107,7 +107,7 @@ void ntt_stage_parallel8(int32_t N, int32_t core_idx, int32_t *pA1, int32_t *roo
 
 extern "C" {
 
-void ntt_stage0_to_Nminus5(int32_t idx, int32_t N_all, int32_t n_core, int32_t *a_in, int32_t *root_in, int32_t *c_out, int32_t N, int32_t logN, int32_t p, int32_t w, int32_t u) {
+void ntt_stage0_to_Nminus5(int32_t N_all, int32_t N, int32_t logN, int32_t core_idx, int32_t *a_in, int32_t *root_in, int32_t *c_out, int32_t p, int32_t w, int32_t u) {
   const int N_half = N/ 2;
   int32_t root_idx = N_all / 2;
   int32_t bf_width = 1;
@@ -130,7 +130,7 @@ void ntt_stage0_to_Nminus5(int32_t idx, int32_t N_all, int32_t n_core, int32_t *
     int j = i + 1;
     int32_t v0 = a_in[i];
     int32_t v1 = a_in[j];
-    int32_t root = root_in[root_idx + idx * N_half / bf_width + k];
+    int32_t root = root_in[root_idx + core_idx * N_half / bf_width + k];
     a_in[i] = modadd(v0, v1, p);
     a_in[j] = barrett_2k(modsub(v0, v1, p), root, p, w, u);
   }
@@ -145,7 +145,7 @@ void ntt_stage0_to_Nminus5(int32_t idx, int32_t N_all, int32_t n_core, int32_t *
     int j = i + bf_width;
     int32_t v0 = a_in[i];
     int32_t v1 = a_in[j];
-    int32_t root = root_in[root_idx + (idx * N_half + k) / bf_width];
+    int32_t root = root_in[root_idx + (core_idx * N_half + k) / bf_width];
     a_in[i] = modadd(v0, v1, p);
     a_in[j] = barrett_2k(modsub(v0, v1, p), root, p, w, u);
   }
@@ -160,7 +160,7 @@ void ntt_stage0_to_Nminus5(int32_t idx, int32_t N_all, int32_t n_core, int32_t *
     int j = i + bf_width;
     int32_t v0 = a_in[i];
     int32_t v1 = a_in[j];
-    int32_t root = root_in[root_idx + (idx * N_half + k) / bf_width];
+    int32_t root = root_in[root_idx + (core_idx * N_half + k) / bf_width];
     a_in[i] = modadd(v0, v1, p);
     a_in[j] = barrett_2k(modsub(v0, v1, p), root, p, w, u);
   }
@@ -173,7 +173,7 @@ void ntt_stage0_to_Nminus5(int32_t idx, int32_t N_all, int32_t n_core, int32_t *
   for (int stage = 3; stage < logN; stage++){
     bf_width *= 2;
     root_idx /= 2;
-    ntt_stage_parallel8(N, idx, a_in, root_in, bf_width, root_idx, F, p, w, u);     
+    ntt_stage_parallel8(N, core_idx, a_in, root_in, bf_width, root_idx, F, p, w, u);     
   }
   event1();
 /*

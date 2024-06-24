@@ -44,10 +44,10 @@ def ntt():
         memRef_ty_scalar = T.memref(1, T.i32())
         
         # AIE Core Function declarations
-        # void ntt_stage0_to_Nminus5(int32_t idx, int32_t N_all, int32_t n_core, int32_t *a_in, int32_t *root_in, int32_t *c_out, int32_t N, int32_t logN, int32_t p, int32_t w, int32_t u)
+        # void ntt_stage0_to_Nminus5(int32_t N_all, int32_t N, int32_t logN, int32_t core_idx, int32_t *a_in, int32_t *root_in, int32_t *c_out, int32_t p, int32_t w, int32_t u) {
         ntt_core = external_func(
             "ntt_stage0_to_Nminus5",
-            inputs=[T.i32(), T.i32(), T.i32(), memRef_ty_core, memRef_ty_vec, memRef_ty_core, T.i32(), T.i32(), T.i32(), T.i32(), T.i32()],
+            inputs=[T.i32(), T.i32(), T.i32(), T.i32(), memRef_ty_core, memRef_ty_vec, memRef_ty_core, T.i32(), T.i32(), T.i32()],
         )
 
         # Tile declarations
@@ -110,7 +110,8 @@ def ntt():
                         elem_out = of_outs_core[c][r].acquire(ObjectFifoPort.Produce, 1)
                         elem_in = of_ins_core[c][r].acquire(ObjectFifoPort.Consume, 1)
                         elem_root = of_inroots_core[c].acquire(ObjectFifoPort.Consume, 1)
-                        call(ntt_core, [core_idx, N, n_core, elem_in, elem_root, elem_out, N_percore, log2_N_percore, p, barrett_w, barrett_u])
+                        # void ntt_stage0_to_Nminus5(int32_t N_all, int32_t N, int32_t logN, int32_t core_idx, int32_t *a_in, int32_t *root_in, int32_t *c_out, int32_t p, int32_t w, int32_t u) {
+                        call(ntt_core, [N, N_percore, log2_N_percore, core_idx, elem_in, elem_root, elem_out, p, barrett_w, barrett_u])
                         of_ins_core[c][r].release(ObjectFifoPort.Consume, 1)
                         of_inroots_core[c].release(ObjectFifoPort.Consume, 1)
                         of_outs_core[c][r].release(ObjectFifoPort.Produce, 1)
