@@ -84,7 +84,7 @@ void ntt_stage_parallel8(int32_t N, int32_t idx, int32_t *pA1, int32_t *root_in,
         int32_t cycle = bf_width / VEC_NUM;
         int32_t idx_base = (i / cycle) * bf_width * 2 + (i % cycle) * VEC_NUM;
         int32_t *__restrict pA1_i = pA1 + idx_base;
-        int32_t root = root_in[root_idx + idx * N / (2 * bf_width) + i / cycle];
+        int32_t root = root_in[root_idx + i / cycle];
         aie::vector<int32_t, VEC_NUM> v0 = aie::load_v<VEC_NUM>(pA1_i);
         aie::vector<int32_t, VEC_NUM> v1 = aie::load_v<VEC_NUM>(pA1_i + bf_width);
         aie::vector<int32_t, VEC_NUM> p_vector = aie::broadcast<int32_t, VEC_NUM>(p);
@@ -164,13 +164,14 @@ void ntt_stage0_to_Nminus5(int32_t idx, int32_t *a_in, int32_t *root_in, int32_t
     a_in[i] = modadd(v0, v1, p);
     a_in[j] = barrett_2k(modsub(v0, v1, p), root, p, w, u);
   }
+  event1();
 
   // Stage 3 to Stage N-1
   event0();
   vec_prime = 8;
   F = N_half / vec_prime;
   //for (int stage = 3; stage < logN; stage++){
-  for (int stage = 3; stage < 5; stage++){
+  for (int stage = 3; stage < logN; stage++){
     bf_width *= 2;
     root_idx /= 2;
     ntt_stage_parallel8(N, idx, a_in, root_in, bf_width, root_idx, F, p, w, u);     

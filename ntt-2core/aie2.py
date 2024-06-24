@@ -107,7 +107,7 @@ def ntt():
                         elem_out = of_outs_core[c][r].acquire(ObjectFifoPort.Produce, 1)
                         elem_in = of_ins_core[c][r].acquire(ObjectFifoPort.Consume, 1)
                         elem_root = of_inroots_core[c].acquire(ObjectFifoPort.Consume, 1)
-                        call(ntt_core, [core_idx, elem_in, elem_root, elem_out, N // n_core, logN - n_core, p, barrett_w, barrett_u])
+                        call(ntt_core, [core_idx, elem_in, elem_root, elem_out, N // n_core, logN - n_core + 1, p, barrett_w, barrett_u])
                         of_ins_core[c][r].release(ObjectFifoPort.Consume, 1)
                         of_inroots_core[c].release(ObjectFifoPort.Consume, 1)
                         of_outs_core[c][r].release(ObjectFifoPort.Produce, 1)
