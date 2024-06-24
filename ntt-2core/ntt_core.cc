@@ -116,13 +116,14 @@ void ntt_stage0_to_Nminus5(int32_t idx, int32_t *a_in, int32_t *root_in, int32_t
   int32_t *__restrict pA1 = a_in;
   int32_t *__restrict pC = c_out;
   int32_t *__restrict pRoot = root_in;
-
   // Mask vector on scalar
   for (int i = 0; i < N / 2; i++){
     c_out[i * 2] = 0;
     c_out[i * 2 + 1] = 1;
   }
 
+  // Stage 1
+  event0();
   for (int k = 0; k < N_half; k++){
     int i = 2 * k;
     int j = i + 1;
@@ -149,6 +150,7 @@ void ntt_stage0_to_Nminus5(int32_t idx, int32_t *a_in, int32_t *root_in, int32_t
   }
   event1();
 
+
   // Stage 2
   event0();
   bf_width *= 2;
@@ -162,18 +164,13 @@ void ntt_stage0_to_Nminus5(int32_t idx, int32_t *a_in, int32_t *root_in, int32_t
     a_in[i] = modadd(v0, v1, p);
     a_in[j] = barrett_2k(modsub(v0, v1, p), root, p, w, u);
   }
-  /*
-  vec_prime = 4;
-  F = N_half / vec_prime;
-  ntt_stage_parallel4(a_in, root_in, bf_width, root_idx, F, p, w, u); 
-  */
-  event1();
 
   // Stage 3 to Stage N-1
   event0();
   vec_prime = 8;
   F = N_half / vec_prime;
-  for (int stage = 3; stage < logN; stage++){
+  //for (int stage = 3; stage < logN; stage++){
+  for (int stage = 3; stage < 5; stage++){
     bf_width *= 2;
     root_idx /= 2;
     ntt_stage_parallel8(N, idx, a_in, root_in, bf_width, root_idx, F, p, w, u);     

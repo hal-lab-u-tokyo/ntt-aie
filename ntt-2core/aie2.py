@@ -26,7 +26,7 @@ def ntt():
     buffer_depth = 2
 
     # NTT parameters
-    logN = 10
+    logN = 11
     N = 1 << logN
     N_in_bytes = N * 4
     p = 3329
@@ -94,7 +94,7 @@ def ntt():
         
         # Set up a circuit-switched flow from core to shim for tracing information
         if trace_size > 0:
-            flow(ComputeTile[0][0], WireBundle.Trace, 0, ShimTile[0], WireBundle.DMA, 1)
+            flow(ComputeTiles[0][0], WireBundle.Trace, 0, ShimTiles[0], WireBundle.DMA, 1)
 
         # Compute tile 
         for c in range(n_column):
@@ -107,14 +107,7 @@ def ntt():
                         elem_out = of_outs_core[c][r].acquire(ObjectFifoPort.Produce, 1)
                         elem_in = of_ins_core[c][r].acquire(ObjectFifoPort.Consume, 1)
                         elem_root = of_inroots_core[c].acquire(ObjectFifoPort.Consume, 1)
-                        for i in for_(N // n_core):
-                            v0 = memref.load(elem_in, [i])
-                            v1 = memref.load(elem_root, [core_idx * N // n_core + i])
-                            v2 = arith.addi(v0, v0)
-                            call(ntt_core, [core_idx, elem_in, elem_root, elem_out, N // n_core, logN - n_core, p, barrett_w, barrett_u])
-                            v3 = arith.addi(v2, arith.constant(core_idx, T.i32()))
-                            memref.store(v3, elem_out, [i])
-                            yield_([])
+                        call(ntt_core, [core_idx, elem_in, elem_root, elem_out, N // n_core, logN - n_core, p, barrett_w, barrett_u])
                         of_ins_core[c][r].release(ObjectFifoPort.Consume, 1)
                         of_inroots_core[c].release(ObjectFifoPort.Consume, 1)
                         of_outs_core[c][r].release(ObjectFifoPort.Produce, 1)

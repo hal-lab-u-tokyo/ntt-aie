@@ -44,7 +44,7 @@ void make_roots(int32_t n, std::vector<int32_t> &roots, int64_t p, int64_t g){
 int main(int argc, const char *argv[]) {
   constexpr int64_t p = 3329;
   constexpr int64_t g = 3;
-  constexpr int64_t n = 10;
+  constexpr int64_t n = 11;
   constexpr int64_t trace_size = 8192;
   int IN_VOLUME = 1 << n;
   int OUT_VOLUME = IN_VOLUME + trace_size;
@@ -133,8 +133,8 @@ int main(int argc, const char *argv[]) {
 
   // Compare out to golden
   std::vector<int32_t> answers;
-  /*
-  std::string filename = std::format("../../data/ans_q{}_n{}.txt", p, n);
+  
+  std::string filename = std::format("../../data/ans_q{}_n{}_stage{}.txt", p, n, 4);
   std::ifstream ansFile(filename);
   if (!ansFile) {
       std::cerr << "Error opening file" << std::endl;
@@ -144,8 +144,8 @@ int main(int argc, const char *argv[]) {
   while (ansFile >> ans) {
       answers.push_back(ans);
   }
-  */
 
+  /*
   int n_column = 1;
   int n_row = 2;
   int n_percore = IN_VOLUME / (n_row * n_column);
@@ -154,10 +154,11 @@ int main(int argc, const char *argv[]) {
       int core_idx = i * n_column + j;
       for (int k = 0; k < n_percore; k++){
         int idx = core_idx * n_percore + k;
-        answers.push_back(idx + core_idx + root[idx]); 
+        answers.push_back(idx); 
       }
     }
   }
+  */
   
   int errors = 0;
   std::cout << "Verifying results ..." << std::endl;
