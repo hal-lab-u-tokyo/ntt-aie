@@ -21,12 +21,12 @@ import aie.utils.trace as trace_utils
 def ntt():
     # AIETile parameters
     n_column = 1
-    n_row = 2
+    n_row = 1
     n_core = n_column * n_row
     buffer_depth = 2
 
     # NTT parameters
-    logN = 8
+    logN = 10
     N = 1 << logN
     N_in_bytes = N * 4
     p = 3329
@@ -41,9 +41,10 @@ def ntt():
         memRef_ty_scalar = T.memref(1, T.i32())
         
         # AIE Core Function declarations
-        ntt_stage0_to_Nminus5 = external_func(
+        # void ntt_stage0_to_Nminus5(int32_t idx, int32_t *a_in, int32_t *root_in, int32_t *c_out, int32_t N, int32_t logN, int32_t p, int32_t w, int32_t u)
+        ntt_core = external_func(
             "ntt_stage0_to_Nminus5",
-            inputs=[T.i32(), memRef_ty_vec, memRef_ty_vec, memRef_ty_vec, T.i32(), T.i32(), T.i32(), T.i32(), T.i32()],
+            inputs=[T.i32(), memRef_ty_core, memRef_ty_vec, memRef_ty_core, T.i32(), T.i32(), T.i32(), T.i32(), T.i32()],
         )
 
         # Tile declarations
@@ -98,7 +99,7 @@ def ntt():
         # Compute tile 
         for c in range(n_column):
             for r in range(n_row):
-                @core(ComputeTiles[c][r])
+                @core(ComputeTiles[c][r], "ntt_core.o")
                 def core_body():
                     # Effective while(1)
                     core_idx = n_column * c + r
@@ -109,7 +110,8 @@ def ntt():
                         for i in for_(N // n_core):
                             v0 = memref.load(elem_in, [i])
                             v1 = memref.load(elem_root, [core_idx * N // n_core + i])
-                            v2 = arith.addi(v0, v1)
+                            v2 = arith.addi(v0, v0)
+                            call(ntt_core, [core_idx, elem_in, elem_root, elem_out, N // n_core, logN - n_core, p, barrett_w, barrett_u])
                             v3 = arith.addi(v2, arith.constant(core_idx, T.i32()))
                             memref.store(v3, elem_out, [i])
                             yield_([])
