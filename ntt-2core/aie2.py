@@ -59,12 +59,12 @@ def ntt():
         
         # AIE-array data movement with object fifos
         of_ins_host = []
-        of_outs_host = []
         of_ins_core = []
+        of_outs_host = []
         of_outs_core = []
         of_ins_host_names = [f"in{c}" for c in range(n_column)]
-        of_outs_host_names = [f"out{c}" for c in range(n_column)]
         of_ins_core_names = [[f"in{c}_{r}" for r in range(n_row)] for c in range(n_column)]
+        of_outs_host_names = [f"out{c}" for c in range(n_column)]
         of_outs_core_names = [[f"out{c}_{r}" for r in range(n_row)] for c in range(n_column)]
         for c in range(n_column):
             of_ins_core.append([])
@@ -76,6 +76,15 @@ def ntt():
                 of_outs_core[c].append(object_fifo(of_outs_core_names[c][r], ComputeTiles[c][r], MemTiles[c], buffer_depth, memRef_ty_core))
             object_fifo_link(of_ins_host[c], of_ins_core[c])
             object_fifo_link(of_outs_core[c], of_outs_host[c])
+
+        # Input Root
+        of_inroots = []
+        of_inroots_tocore = []
+        inroots_names = [f"inroots{c}" for c in range(n_column)]
+        inroots_core_names = [f"inroots_tocore{c}" for c in range(n_column)]
+        for c in range(n_column):
+            of_inroots.append(object_fifo(inroots_names[c], ShimTiles[c], MemTiles[c], buffer_depth, memRef_ty_vec))
+            of_inroots_tocore.append(object_fifo(inroots_core_names[c], MemTiles[c], ComputeTiles[c][0:n_row], buffer_depth, memRef_ty_vec))
         
         # Set up a circuit-switched flow from core to shim for tracing information
         if trace_size > 0:
@@ -91,18 +100,20 @@ def ntt():
                     for _ in for_(2):
                         elem_out = of_outs_core[c][r].acquire(ObjectFifoPort.Produce, 1)
                         elem_in = of_ins_core[c][r].acquire(ObjectFifoPort.Consume, 1)
+                        #elem_root = of_inroots_core[c].acquire(ObjectFifoPort.Consume, 1)
                         for i in for_(N // n_core):
                             v0 = memref.load(elem_in, [i])
                             v1 = arith.addi(v0, arith.constant(idx, T.i32()))
                             memref.store(v1, elem_out, [i])
                             yield_([])
                         of_ins_core[c][r].release(ObjectFifoPort.Consume, 1)
+                        #of_inroots_core[c].release(ObjectFifoPort.Consume, 1)
                         of_outs_core[c][r].release(ObjectFifoPort.Produce, 1)
                         yield_([])
                     
         # To/from AIE-array data movement
         @FuncOp.from_py_func(memRef_ty_vec, memRef_ty_vec, memRef_ty_vec)
-        def sequence(A, root, C):
+        def sequence(input, root, output):
             if trace_size > 0:
                 trace_utils.configure_simple_tracing_aie2(
                     ComputeTiles[0][0],
@@ -115,8 +126,9 @@ def ntt():
             for c in range(n_column):
                 size = N // n_column
                 offset = c * size
-                npu_dma_memcpy_nd(metadata=of_outs_host_names[c], bd_id=c, mem=C, sizes=[1, 1, 1, size], offsets=[0, 0, 0, offset])
-                npu_dma_memcpy_nd(metadata=of_ins_host_names[c], bd_id=n_column+c, mem=A, sizes=[1, 1, 1, size], offsets=[0, 0, 0, offset])
+                npu_dma_memcpy_nd(metadata=of_outs_host_names[c], bd_id=c, mem=output, sizes=[1, 1, 1, size], offsets=[0, 0, 0, offset])
+                npu_dma_memcpy_nd(metadata=of_ins_host_names[c], bd_id=n_column+c, mem=input, sizes=[1, 1, 1, size], offsets=[0, 0, 0, offset])
+                npu_dma_memcpy_nd(metadata=inroots_names[c], bd_id=2*n_column+c, mem=input, sizes=[1, 1, 1, N])
             npu_sync(column=0, row=0, direction=0, channel=0)
 
 trace_size = 0

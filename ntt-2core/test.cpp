@@ -149,7 +149,7 @@ int main(int argc, const char *argv[]) {
   for (int32_t i = 0; i < n_row; i++){
     for (int j = 0; j < n_percore; j++){
       int idx = i * n_percore + j;
-      answers[idx] = idx + i; 
+      answers[idx] = idx + i + root[i]; 
     }
   }
   
