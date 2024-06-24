@@ -79,12 +79,12 @@ aie::vector<int32_t, VEC_NUM> vector_barrett(aie::vector<int32_t, VEC_NUM> v, ai
   return barrett;
 }
 
-void ntt_stage_parallel8(int32_t N, int32_t idx, int32_t *pA1, int32_t *root_in, int32_t bf_width, int32_t root_idx, int32_t F, int32_t p, int32_t w, int32_t u){
+void ntt_stage_parallel8(int32_t N, int32_t core_idx, int32_t *pA1, int32_t *root_in, int32_t bf_width, int32_t root_idx, int32_t F, int32_t p, int32_t w, int32_t u){
     for (int i = 0; i < F; i++){
         int32_t cycle = bf_width / VEC_NUM;
         int32_t idx_base = (i / cycle) * bf_width * 2 + (i % cycle) * VEC_NUM;
         int32_t *__restrict pA1_i = pA1 + idx_base;
-        int32_t root = root_in[root_idx + idx * N / (2 * bf_width) + i / cycle];
+        int32_t root = root_in[root_idx + (core_idx * F + i) / cycle];
         aie::vector<int32_t, VEC_NUM> v0 = aie::load_v<VEC_NUM>(pA1_i);
         aie::vector<int32_t, VEC_NUM> v1 = aie::load_v<VEC_NUM>(pA1_i + bf_width);
         aie::vector<int32_t, VEC_NUM> p_vector = aie::broadcast<int32_t, VEC_NUM>(p);
@@ -107,28 +107,30 @@ void ntt_stage_parallel8(int32_t N, int32_t idx, int32_t *pA1, int32_t *root_in,
 
 extern "C" {
 
-void ntt_stage0_to_Nminus5(int32_t idx, int32_t *a_in, int32_t *root_in, int32_t *c_out, int32_t N, int32_t logN, int32_t p, int32_t w, int32_t u) {
-  const int N_half = N / 2;
-  int32_t root_idx = N_half;
+void ntt_stage0_to_Nminus5(int32_t N_all, int32_t N, int32_t logN, int32_t core_idx, int32_t *a_in, int32_t *root_in, int32_t *c_out, int32_t p, int32_t w, int32_t u) {
+  const int N_half = N/ 2;
+  int32_t root_idx = N_all / 2;
   int32_t bf_width = 1;
   int32_t vec_prime = 1;
+  int32_t cycle = 1;
   int32_t F = N_half / vec_prime;
   int32_t *__restrict pA1 = a_in;
   int32_t *__restrict pC = c_out;
   int32_t *__restrict pRoot = root_in;
-
   // Mask vector on scalar
   for (int i = 0; i < N / 2; i++){
     c_out[i * 2] = 0;
     c_out[i * 2 + 1] = 1;
   }
 
+  // Stage 0
+  event0();
   for (int k = 0; k < N_half; k++){
     int i = 2 * k;
     int j = i + 1;
     int32_t v0 = a_in[i];
     int32_t v1 = a_in[j];
-    int32_t root = root_in[root_idx + idx * N / 2 + k];
+    int32_t root = root_in[root_idx + core_idx * N_half / bf_width + k];
     a_in[i] = modadd(v0, v1, p);
     a_in[j] = barrett_2k(modsub(v0, v1, p), root, p, w, u);
   }
@@ -143,7 +145,7 @@ void ntt_stage0_to_Nminus5(int32_t idx, int32_t *a_in, int32_t *root_in, int32_t
     int j = i + bf_width;
     int32_t v0 = a_in[i];
     int32_t v1 = a_in[j];
-    int32_t root = root_in[root_idx + idx * N / (2 * bf_width) + k / bf_width];
+    int32_t root = root_in[root_idx + (core_idx * N_half + k) / bf_width];
     a_in[i] = modadd(v0, v1, p);
     a_in[j] = barrett_2k(modsub(v0, v1, p), root, p, w, u);
   }
@@ -158,15 +160,10 @@ void ntt_stage0_to_Nminus5(int32_t idx, int32_t *a_in, int32_t *root_in, int32_t
     int j = i + bf_width;
     int32_t v0 = a_in[i];
     int32_t v1 = a_in[j];
-    int32_t root = root_in[root_idx + idx * N / (2 * bf_width) + k / bf_width];
+    int32_t root = root_in[root_idx + (core_idx * N_half + k) / bf_width];
     a_in[i] = modadd(v0, v1, p);
     a_in[j] = barrett_2k(modsub(v0, v1, p), root, p, w, u);
   }
-  /*
-  vec_prime = 4;
-  F = N_half / vec_prime;
-  ntt_stage_parallel4(a_in, root_in, bf_width, root_idx, F, p, w, u); 
-  */
   event1();
 
   // Stage 3 to Stage N-1
@@ -176,10 +173,11 @@ void ntt_stage0_to_Nminus5(int32_t idx, int32_t *a_in, int32_t *root_in, int32_t
   for (int stage = 3; stage < logN; stage++){
     bf_width *= 2;
     root_idx /= 2;
-    ntt_stage_parallel8(N, idx, a_in, root_in, bf_width, root_idx, F, p, w, u);     
+    ntt_stage_parallel8(N, core_idx, a_in, root_in, bf_width, root_idx, F, p, w, u);     
   }
   event1();
-  
+/*
+*/
   // Write back
   for (int i = 0; i < N; i++){
     c_out[i] = a_in[i];  
