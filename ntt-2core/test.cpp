@@ -154,7 +154,7 @@ int main(int argc, const char *argv[]) {
       int core_idx = i * n_column + j;
       for (int k = 0; k < n_percore; k++){
         int idx = core_idx * n_percore + k;
-        answers.push_back(root[idx]); 
+        answers.push_back(idx + core_idx + root[idx]); 
       }
     }
   }
