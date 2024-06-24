@@ -87,12 +87,13 @@ def ntt():
                 @core(ComputeTiles[c][r])
                 def core_body():
                     # Effective while(1)
+                    idx = n_column * c + r
                     for _ in for_(2):
                         elem_out = of_outs_core[c][r].acquire(ObjectFifoPort.Produce, 1)
                         elem_in = of_ins_core[c][r].acquire(ObjectFifoPort.Consume, 1)
                         for i in for_(N // n_core):
                             v0 = memref.load(elem_in, [i])
-                            v1 = arith.addi(v0, v0)
+                            v1 = arith.addi(v0, arith.constant(idx, T.i32()))
                             memref.store(v1, elem_out, [i])
                             yield_([])
                         of_ins_core[c][r].release(ObjectFifoPort.Consume, 1)
