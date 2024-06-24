@@ -57,35 +57,39 @@ def ntt():
             for r in range(n_row):
                 ComputeTiles[c].append(tile(c, r+2))
         
-        # AIE-array data movement with object fifos
-        of_ins_host = []
-        of_ins_core = []
-        of_outs_host = []
-        of_outs_core = []
-        of_ins_host_names = [f"in{c}" for c in range(n_column)]
+        # Input Array
+        of_ins = []
+        of_ins_core = [[] for c in range(n_column)]
+        of_ins_names = [f"in{c}" for c in range(n_column)]
         of_ins_core_names = [[f"in{c}_{r}" for r in range(n_row)] for c in range(n_column)]
-        of_outs_host_names = [f"out{c}" for c in range(n_column)]
-        of_outs_core_names = [[f"out{c}_{r}" for r in range(n_row)] for c in range(n_column)]
         for c in range(n_column):
-            of_ins_core.append([])
-            of_outs_core.append([])
-            of_ins_host.append(object_fifo(of_ins_host_names[c], ShimTiles[c], MemTiles[c], buffer_depth, memRef_ty_column))
-            of_outs_host.append(object_fifo(of_outs_host_names[c], MemTiles[c], ShimTiles[c], buffer_depth, memRef_ty_column))
+            # Create link ShimTile -> MemTile
+            of_ins.append(object_fifo(of_ins_names[c], ShimTiles[c], MemTiles[c], buffer_depth, memRef_ty_column))
             for r in range(n_row):
+                # Create link MemTile -> ComputeTile
                 of_ins_core[c].append(object_fifo(of_ins_core_names[c][r], MemTiles[c], ComputeTiles[c][r], buffer_depth, memRef_ty_core))
-                of_outs_core[c].append(object_fifo(of_outs_core_names[c][r], ComputeTiles[c][r], MemTiles[c], buffer_depth, memRef_ty_core))
-            object_fifo_link(of_ins_host[c], of_ins_core[c])
-            object_fifo_link(of_outs_core[c], of_outs_host[c])
+            object_fifo_link(of_ins[c], of_ins_core[c])
 
         # Input Root
         of_inroots = []
-        of_inroots_tocore = []
-        inroots_names = [f"inroots{c}" for c in range(n_column)]
-        inroots_core_names = [f"inroots_tocore{c}" for c in range(n_column)]
+        of_inroots_core = []
+        of_inroots_name = [f"inroots{c}" for c in range(n_column)]
+        of_inroots_core_names = [f"inroots_core{c}" for c in range(n_column)]
         for c in range(n_column):
-            of_inroots.append(object_fifo(inroots_names[c], ShimTiles[c], MemTiles[c], buffer_depth, memRef_ty_vec))
-            of_inroots_tocore.append(object_fifo(inroots_core_names[c], MemTiles[c], ComputeTiles[c][0:n_row], buffer_depth, memRef_ty_vec))
-            object_fifo_link(of_inroots[c], of_inroots_tocore[c])
+            of_inroots.append(object_fifo(of_inroots_name[c], ShimTiles[c], MemTiles[c], buffer_depth, memRef_ty_vec))
+            of_inroots_core.append(object_fifo(of_inroots_core_names[c], MemTiles[c], ComputeTiles[c][0:n_row], buffer_depth, memRef_ty_vec))
+            object_fifo_link(of_inroots[c], of_inroots_core[c])
+
+        # Output Array
+        of_outs = []
+        of_outs_core = [[] for c in range(n_column)]
+        of_outs_names = [f"out{c}" for c in range(n_column)]
+        of_outs_core_names = [[f"out{c}_{r}" for r in range(n_row)] for c in range(n_column)]
+        for c in range(n_column):
+            of_outs.append(object_fifo(of_outs_names[c], MemTiles[c], ShimTiles[c], buffer_depth, memRef_ty_column))
+            for r in range(n_row):
+                of_outs_core[c].append(object_fifo(of_outs_core_names[c][r], ComputeTiles[c][r], MemTiles[c], buffer_depth, memRef_ty_core))
+            object_fifo_link(of_outs_core[c], of_outs[c])
         
         # Set up a circuit-switched flow from core to shim for tracing information
         if trace_size > 0:
@@ -101,7 +105,7 @@ def ntt():
                     for _ in for_(2):
                         elem_out = of_outs_core[c][r].acquire(ObjectFifoPort.Produce, 1)
                         elem_in = of_ins_core[c][r].acquire(ObjectFifoPort.Consume, 1)
-                        elem_root = of_inroots_tocore[c].acquire(ObjectFifoPort.Consume, 1)
+                        elem_root = of_inroots_core[c].acquire(ObjectFifoPort.Consume, 1)
                         for i in for_(N // n_core):
                             v0 = memref.load(elem_in, [i])
                             v1 = memref.load(elem_root, [core_idx * N // n_core + i])
@@ -110,7 +114,7 @@ def ntt():
                             memref.store(v3, elem_out, [i])
                             yield_([])
                         of_ins_core[c][r].release(ObjectFifoPort.Consume, 1)
-                        of_inroots_tocore[c].release(ObjectFifoPort.Consume, 1)
+                        of_inroots_core[c].release(ObjectFifoPort.Consume, 1)
                         of_outs_core[c][r].release(ObjectFifoPort.Produce, 1)
                         yield_([])
                     
@@ -129,9 +133,9 @@ def ntt():
             for c in range(n_column):
                 size = N // n_column
                 offset = c * size
-                npu_dma_memcpy_nd(metadata=of_outs_host_names[c], bd_id=c, mem=output, sizes=[1, 1, 1, size], offsets=[0, 0, 0, offset])
-                npu_dma_memcpy_nd(metadata=of_ins_host_names[c], bd_id=n_column+c, mem=input, sizes=[1, 1, 1, size], offsets=[0, 0, 0, offset])
-                npu_dma_memcpy_nd(metadata=inroots_names[c], bd_id=2*n_column+c, mem=root, sizes=[1, 1, 1, N])
+                npu_dma_memcpy_nd(metadata=of_outs_names[c], bd_id=c, mem=output, sizes=[1, 1, 1, size], offsets=[0, 0, 0, offset])
+                npu_dma_memcpy_nd(metadata=of_ins_names[c], bd_id=n_column+c, mem=input, sizes=[1, 1, 1, size], offsets=[0, 0, 0, offset])
+                npu_dma_memcpy_nd(metadata=of_inroots_name[c], bd_id=2*n_column+c, mem=root, sizes=[1, 1, 1, N])
             npu_sync(column=0, row=0, direction=0, channel=0)
 
 trace_size = 0
