@@ -44,7 +44,7 @@ void make_roots(int32_t n, std::vector<int32_t> &roots, int64_t p, int64_t g){
 int main(int argc, const char *argv[]) {
   constexpr int64_t p = 3329;
   constexpr int64_t g = 3;
-  constexpr int64_t n = 10;
+  constexpr int64_t n = 8;
   constexpr int64_t trace_size = 8192;
   int IN_VOLUME = 1 << n;
   int OUT_VOLUME = IN_VOLUME + trace_size;
@@ -135,7 +135,7 @@ int main(int argc, const char *argv[]) {
   std::string filename = std::format("../../data/ans_q{}_n{}.txt", p, n);
   std::ifstream ansFile(filename);
   if (!ansFile) {
-      std::cerr << "Error opening file: " << filename << std::endl;
+      std::cerr << "Error opening file" << std::endl;
       return 1;
   }
   std::vector<int32_t> answers;
