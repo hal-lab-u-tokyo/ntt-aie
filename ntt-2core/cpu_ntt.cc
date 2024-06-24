@@ -211,7 +211,7 @@ int main() {
 
     std::cout << "========= ntt ===========" << std::endl;
     ntt(a, n, roots, p, barrett_w, barrett_u, stage);
-    export_vector_to_file(a, p, logn, stage);
+    //export_vector_to_file(a, p, logn, stage);
 
     //std::cout << "========= intt ============" << std::endl;
     //intt(a, n, invroots, p, n_inv);
