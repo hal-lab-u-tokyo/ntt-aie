@@ -107,7 +107,7 @@ void ntt_stage_parallel8(int32_t N, int32_t core_idx, int32_t *pA1, int32_t *roo
 
 extern "C" {
 
-void ntt_stage0_to_Nminus5(int32_t N_all, int32_t N, int32_t logN, int32_t core_idx, int32_t *a_in, int32_t *root_in, int32_t *c_out, int32_t p, int32_t w, int32_t u) {
+void ntt_stage0_to_Nminus5(int32_t N_all, int32_t N, int32_t logN, int32_t core_idx, int32_t *a_in, int32_t *root_in, int32_t *c_out0, int32_t *c_out1, int32_t p, int32_t w, int32_t u) {
   const int N_half = N/ 2;
   int32_t root_idx = N_all / 2;
   int32_t bf_width = 1;
@@ -115,14 +115,8 @@ void ntt_stage0_to_Nminus5(int32_t N_all, int32_t N, int32_t logN, int32_t core_
   int32_t cycle = 1;
   int32_t F = N_half / vec_prime;
   int32_t *__restrict pA1 = a_in;
-  int32_t *__restrict pC = c_out;
   int32_t *__restrict pRoot = root_in;
-  // Mask vector on scalar
-  for (int i = 0; i < N / 2; i++){
-    c_out[i * 2] = 0;
-    c_out[i * 2 + 1] = 1;
-  }
-
+  
   // Stage 0
   event0();
   for (int k = 0; k < N_half; k++){
@@ -179,8 +173,9 @@ void ntt_stage0_to_Nminus5(int32_t N_all, int32_t N, int32_t logN, int32_t core_
 /*
 */
   // Write back
-  for (int i = 0; i < N; i++){
-    c_out[i] = a_in[i];  
+  for (int i = 0; i < N_half; i++){
+    c_out0[i] = a_in[i];  
+    c_out1[i] = a_in[i + N_half];
   }
 }
 

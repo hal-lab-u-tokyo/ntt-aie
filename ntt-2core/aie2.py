@@ -41,13 +41,14 @@ def ntt():
         memRef_ty_vec = T.memref(N, T.i32())
         memRef_ty_column = T.memref(N // n_column, T.i32())
         memRef_ty_core = T.memref(N // n_core, T.i32())
+        memRef_ty_core_half = T.memref(N // (n_core * 2), T.i32())
         memRef_ty_scalar = T.memref(1, T.i32())
         
         # AIE Core Function declarations
         # void ntt_stage0_to_Nminus5(int32_t N_all, int32_t N, int32_t logN, int32_t core_idx, int32_t *a_in, int32_t *root_in, int32_t *c_out, int32_t p, int32_t w, int32_t u) {
         ntt_core = external_func(
             "ntt_stage0_to_Nminus5",
-            inputs=[T.i32(), T.i32(), T.i32(), T.i32(), memRef_ty_core, memRef_ty_vec, memRef_ty_core, T.i32(), T.i32(), T.i32()],
+            inputs=[T.i32(), T.i32(), T.i32(), T.i32(), memRef_ty_core, memRef_ty_vec, memRef_ty_core_half, memRef_ty_core_half, T.i32(), T.i32(), T.i32()],
         )
 
         # Tile declarations
@@ -86,14 +87,25 @@ def ntt():
 
         # Output Array
         of_outs = []
-        of_outs_core = [[] for c in range(n_column)]
+        of_outs_core = [[[] for r in range(n_row)] for c in range(n_column)]
         of_outs_names = [f"out{c}" for c in range(n_column)]
-        of_outs_core_names = [[f"out{c}_{r}" for r in range(n_row)] for c in range(n_column)]
+        of_outs_core_names = [[[f"out{c}_{r}first", f"out{c}_{r}second"] for r in range(n_row)] for c in range(n_column)]
         for c in range(n_column):
             of_outs.append(object_fifo(of_outs_names[c], MemTiles[c], ShimTiles[c], buffer_depth, memRef_ty_column))
             for r in range(n_row):
-                of_outs_core[c].append(object_fifo(of_outs_core_names[c][r], ComputeTiles[c][r], MemTiles[c], buffer_depth, memRef_ty_core))
-            object_fifo_link(of_outs_core[c], of_outs[c])
+                for i in range(2):
+                    of_outs_core[c][r].append(object_fifo(of_outs_core_names[c][r][i], ComputeTiles[c][r], MemTiles[c], buffer_depth, memRef_ty_core_half))
+            object_fifo_link([item for sublist in of_outs_core[c] for item in sublist], of_outs[c])
+
+        # Link between ComputeTiles
+        of_up = [[] for c in range(n_column)]
+        of_down = [[] for c in range(n_column)]
+        of_up_names = [[f"up{c}_{2*r}{2*r+1}" for r in range(n_row//2)] for c in range(n_column)]
+        of_down_names = [[f"down{c}_{2*r+1}{2*r}" for r in range(n_row//2)] for c in range(n_column)]
+        for c in range(n_column):
+            for r in range(n_row // 2):
+                of_up[c].append(object_fifo(of_up_names[c][r], ComputeTiles[c][2 * r], ComputeTiles[c][2 * r + 1], buffer_depth, memRef_ty_core_half))
+                of_down[c].append(object_fifo(of_down_names[c][r], ComputeTiles[c][2 * r], ComputeTiles[c][2 * r + 1], buffer_depth, memRef_ty_core_half))
         
         # Set up a circuit-switched flow from core to shim for tracing information
         if trace_size > 0:
@@ -107,14 +119,16 @@ def ntt():
                     # Effective while(1)
                     core_idx = n_column * c + r
                     for _ in for_(2):
-                        elem_out = of_outs_core[c][r].acquire(ObjectFifoPort.Produce, 1)
+                        elem_out_fir = of_outs_core[c][r][0].acquire(ObjectFifoPort.Produce, 1)
+                        elem_out_sec = of_outs_core[c][r][1].acquire(ObjectFifoPort.Produce, 1)
                         elem_in = of_ins_core[c][r].acquire(ObjectFifoPort.Consume, 1)
                         elem_root = of_inroots_core[c].acquire(ObjectFifoPort.Consume, 1)
                         # void ntt_stage0_to_Nminus5(int32_t N_all, int32_t N, int32_t logN, int32_t core_idx, int32_t *a_in, int32_t *root_in, int32_t *c_out, int32_t p, int32_t w, int32_t u) {
-                        call(ntt_core, [N, N_percore, log2_N_percore, core_idx, elem_in, elem_root, elem_out, p, barrett_w, barrett_u])
+                        call(ntt_core, [N, N_percore, log2_N_percore, core_idx, elem_in, elem_root, elem_out_fir, elem_out_sec, p, barrett_w, barrett_u])
                         of_ins_core[c][r].release(ObjectFifoPort.Consume, 1)
                         of_inroots_core[c].release(ObjectFifoPort.Consume, 1)
-                        of_outs_core[c][r].release(ObjectFifoPort.Produce, 1)
+                        of_outs_core[c][r][0].release(ObjectFifoPort.Produce, 1)
+                        of_outs_core[c][r][1].release(ObjectFifoPort.Produce, 1)
                         yield_([])
                     
         # To/from AIE-array data movement
