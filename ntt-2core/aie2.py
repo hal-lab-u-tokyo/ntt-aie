@@ -85,6 +85,7 @@ def ntt():
         for c in range(n_column):
             of_inroots.append(object_fifo(inroots_names[c], ShimTiles[c], MemTiles[c], buffer_depth, memRef_ty_vec))
             of_inroots_tocore.append(object_fifo(inroots_core_names[c], MemTiles[c], ComputeTiles[c][0:n_row], buffer_depth, memRef_ty_vec))
+            object_fifo_link(of_inroots[c], of_inroots_tocore[c])
         
         # Set up a circuit-switched flow from core to shim for tracing information
         if trace_size > 0:
@@ -100,14 +101,16 @@ def ntt():
                     for _ in for_(2):
                         elem_out = of_outs_core[c][r].acquire(ObjectFifoPort.Produce, 1)
                         elem_in = of_ins_core[c][r].acquire(ObjectFifoPort.Consume, 1)
-                        #elem_root = of_inroots_core[c].acquire(ObjectFifoPort.Consume, 1)
+                        elem_root = of_inroots_tocore[c].acquire(ObjectFifoPort.Consume, 1)
                         for i in for_(N // n_core):
                             v0 = memref.load(elem_in, [i])
-                            v1 = arith.addi(v0, arith.constant(idx, T.i32()))
+                            v1 = memref.load(elem_root, [idx * N // n_core + i])
+                            v2 = arith.addi(v0, v1)
+                            #v1 = arith.addi(v0, arith.constant(idx, T.i32()))
                             memref.store(v1, elem_out, [i])
                             yield_([])
                         of_ins_core[c][r].release(ObjectFifoPort.Consume, 1)
-                        #of_inroots_core[c].release(ObjectFifoPort.Consume, 1)
+                        of_inroots_tocore[c].release(ObjectFifoPort.Consume, 1)
                         of_outs_core[c][r].release(ObjectFifoPort.Produce, 1)
                         yield_([])
                     
@@ -128,7 +131,7 @@ def ntt():
                 offset = c * size
                 npu_dma_memcpy_nd(metadata=of_outs_host_names[c], bd_id=c, mem=output, sizes=[1, 1, 1, size], offsets=[0, 0, 0, offset])
                 npu_dma_memcpy_nd(metadata=of_ins_host_names[c], bd_id=n_column+c, mem=input, sizes=[1, 1, 1, size], offsets=[0, 0, 0, offset])
-                npu_dma_memcpy_nd(metadata=inroots_names[c], bd_id=2*n_column+c, mem=input, sizes=[1, 1, 1, N])
+                npu_dma_memcpy_nd(metadata=inroots_names[c], bd_id=2*n_column+c, mem=root, sizes=[1, 1, 1, N])
             npu_sync(column=0, row=0, direction=0, channel=0)
 
 trace_size = 0

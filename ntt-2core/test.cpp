@@ -93,7 +93,7 @@ int main(int argc, const char *argv[]) {
   root[0] = 1;
   make_roots(IN_VOLUME, root, p, g);
   std::cout << "roots: ";
-  for (int i = IN_VOLUME / 2; i < IN_VOLUME; i++){
+  for (int i = 0; i < IN_VOLUME; i++){
       std::cout << root[i] << " ";
   }
   std::cout << std::endl;
@@ -132,24 +132,30 @@ int main(int argc, const char *argv[]) {
   bo_outC.sync(XCL_BO_SYNC_BO_FROM_DEVICE);
 
   // Compare out to golden
+  std::vector<int32_t> answers;
+  /*
   std::string filename = std::format("../../data/ans_q{}_n{}.txt", p, n);
   std::ifstream ansFile(filename);
   if (!ansFile) {
       std::cerr << "Error opening file" << std::endl;
       return 1;
   }
-  std::vector<int32_t> answers;
   int ans;
   while (ansFile >> ans) {
       answers.push_back(ans);
   }
+  */
 
+  int n_column = 1;
   int n_row = 2;
-  int n_percore = IN_VOLUME / n_row;
-  for (int32_t i = 0; i < n_row; i++){
-    for (int j = 0; j < n_percore; j++){
-      int idx = i * n_percore + j;
-      answers[idx] = idx + i + root[i]; 
+  int n_percore = IN_VOLUME / (n_row * n_column);
+  for (int i = 0; i < n_column; i++){
+    for (int j = 0; j < n_row; j++){
+      int core_idx = i * n_column + j;
+      for (int k = 0; k < n_percore; k++){
+        int idx = core_idx * n_percore + k;
+        answers.push_back(root[idx]); 
+      }
     }
   }
   
@@ -160,7 +166,7 @@ int main(int argc, const char *argv[]) {
     int32_t ref = answers[i];
     int32_t test = bufOut[i];
     if (test != ref) {
-      std::cout << "[" << i << "] Error " << test << " != " << ref << std::endl;
+      std::cout << "[" << i << "] Error: (get vs expected) = " << test << " != " << ref << std::endl;
       errors++;
     } else {
       std::cout << "[" << i << "] Correct " << test << " == " << ref << std::endl;
