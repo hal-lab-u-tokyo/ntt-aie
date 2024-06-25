@@ -184,6 +184,7 @@ def ntt():
                             v0 = memref.load(elem_result_from, [i])
                             memref.store(v0, elem_out_local, [i])
                             yield_([])
+                        
                         # Release
                         of_outs_core[c][r][0].release(ObjectFifoPort.Produce, 1)
                         of_outs_core[c][r][1].release(ObjectFifoPort.Produce, 1)
