@@ -46,13 +46,13 @@ def ntt():
         
         # AIE Core Function declarations
         # void ntt_stage_0_to_N_2(int32_t N_all, int32_t N, int32_t logN, int32_t core_idx, int32_t *a_in, int32_t *root_in, int32_t *c_out0, int32_t *c_out1, int32_t p, int32_t w, int32_t u) {
-        ntt_stage_0_to_N_2 = external_func(
-            "ntt_stage_0_to_N_2",
+        ntt_stage_0_to_N_3 = external_func(
+            "ntt_stage_0_to_N_3",
             inputs=[T.i32(), T.i32(), T.i32(), T.i32(), memRef_ty_core, memRef_ty_vec, memRef_ty_core_half, memRef_ty_core_half, T.i32(), T.i32(), T.i32()],
         )
         # void ntt_stage_N_1(int32_t N, int32_t *out0, int32_t *out1, int32_t *in_a0, int32_t *in_a1, int32_t *in_root, int32_t p, int32_t w, int32_t u) {
-        ntt_stage_N_1 = external_func(
-            "ntt_stage_N_1",
+        ntt_stage_N_2 = external_func(
+            "ntt_stage_N_2",
             inputs=[T.i32(), memRef_ty_core_half, memRef_ty_core_half, memRef_ty_core_half, memRef_ty_core_half, memRef_ty_vec, T.i32(), T.i32(), T.i32()],
         )
 
@@ -150,9 +150,9 @@ def ntt():
                         
                         # Call NTT kernel
                         if r % 2 == 0:
-                            call(ntt_stage_0_to_N_2, [N, N_percore, log2_N_percore, core_idx, elem_in, elem_root, elem_buff_local, elem_out_next, p, barrett_w, barrett_u])
+                            call(ntt_stage_0_to_N_3, [N, N_percore, log2_N_percore, core_idx, elem_in, elem_root, elem_buff_local, elem_out_next, p, barrett_w, barrett_u])
                         else:
-                            call(ntt_stage_0_to_N_2, [N, N_percore, log2_N_percore, core_idx, elem_in, elem_root, elem_out_next, elem_buff_local, p, barrett_w, barrett_u])
+                            call(ntt_stage_0_to_N_3, [N, N_percore, log2_N_percore, core_idx, elem_in, elem_root, elem_out_next, elem_buff_local, p, barrett_w, barrett_u])
                         
                         # Write Back
                         elem_out_local = of_outs_core[c][r].acquire(ObjectFifoPort.Produce, 1)
@@ -168,18 +168,15 @@ def ntt():
                             yield_([])
                         
                         # Release
-                        of_inroots_core[c].release(ObjectFifoPort.Consume, 1)
                         of_ins_core[c][r].release(ObjectFifoPort.Consume, 1)
-                        of_buffs[c][r].release(ObjectFifoPort.Produce, 1) 
-                        of_outs_core[c][r].release(ObjectFifoPort.Produce, 1)
                         if r % 2 == 0:
                             of_up[c][r//2].release(ObjectFifoPort.Produce, 1)
                         else:
                             of_down[c][r//2].release(ObjectFifoPort.Produce, 1)
+
                         # ============================
                         #    NTT Stage n-2
                         # ============================
-                        """
                         # Acquire
                         elem_in_next = of_down[c][r//2].acquire(ObjectFifoPort.Consume, 1) if r % 2 == 0 else of_up[c][r//2].acquire(ObjectFifoPort.Consume, 1) 
                         elem_out_next = of_up2[c][r//2].acquire(ObjectFifoPort.Produce, 1) if r % 2 == 0 else of_down2[c][r//2].acquire(ObjectFifoPort.Produce, 1) 
@@ -187,9 +184,9 @@ def ntt():
                         # Call NTT kernel
                         # void ntt_stage_N_1(int32_t N, int32_t *out0, int32_t *out1, int32_t *in_a0, int32_t *in_a1, int32_t *in_root, int32_t p, int32_t w, int32_t u) {
                         if r % 2 == 0:
-                            call(ntt_stage_N_1, [N_percore, elem_buff_local, elem_out_next, elem_buff_local, elem_in_next, elem_root, p, barrett_w, barrett_u])
+                            call(ntt_stage_N_2, [N_percore, elem_buff_local, elem_out_next, elem_buff_local, elem_in_next, elem_root, p, barrett_w, barrett_u])
                         else:
-                            call(ntt_stage_N_1, [N_percore, elem_out_next, elem_buff_local, elem_in_next, elem_buff_local, elem_root, p, barrett_w, barrett_u])
+                            call(ntt_stage_N_2, [N_percore, elem_out_next, elem_buff_local, elem_in_next, elem_buff_local, elem_root, p, barrett_w, barrett_u])
                         
                         # Release
                         of_inroots_core[c].release(ObjectFifoPort.Consume, 1)
@@ -220,7 +217,7 @@ def ntt():
                         if r % 2 == 0:
                             of_down2[c][r//2].release(ObjectFifoPort.Consume, 1)
                         else:
-                            of_up2[c][r//2].release(ObjectFifoPort.Consume, 1)"""
+                            of_up2[c][r//2].release(ObjectFifoPort.Consume, 1)
                         yield_([])
                     
         # To/from AIE-array data movement

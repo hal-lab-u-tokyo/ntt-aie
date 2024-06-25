@@ -99,8 +99,8 @@ void ntt_stage_parallel8_internal(int32_t *out_ptr0, int32_t *out_ptr1, int32_t 
 
 extern "C" {
 
-void ntt_stage_N_1(int32_t N, int32_t *out0, int32_t *out1, int32_t *in0, int32_t *in1, int32_t *in_root, int32_t p, int32_t w, int32_t u) {
-  // Stage N-1
+void ntt_stage_N_2(int32_t N, int32_t *out0, int32_t *out1, int32_t *in0, int32_t *in1, int32_t *in_root, int32_t p, int32_t w, int32_t u) {
+  // Stage N-2
   event0();
   const int N_half = N / 2;
   const int F = N_half / VEC_NUM;
@@ -122,7 +122,7 @@ void ntt_stage_N_1(int32_t N, int32_t *out0, int32_t *out1, int32_t *in0, int32_
   event1();
 }
 
-void ntt_stage_0_to_N_2(int32_t N_all, int32_t N, int32_t logN, int32_t core_idx, int32_t *in_a, int32_t *root_in, int32_t *out0, int32_t *out1, int32_t p, int32_t w, int32_t u) {
+void ntt_stage_0_to_N_3(int32_t N_all, int32_t N, int32_t logN, int32_t core_idx, int32_t *in_a, int32_t *root_in, int32_t *out0, int32_t *out1, int32_t p, int32_t w, int32_t u) {
   const int N_half = N / 2;
   int32_t root_idx = N_all / 2;
   int32_t bf_width = 1;
@@ -172,7 +172,7 @@ void ntt_stage_0_to_N_2(int32_t N_all, int32_t N, int32_t logN, int32_t core_idx
   }
   event1();
 
-  // Stage 3 to Stage N-2
+  // Stage 3 to Stage N-3
   event0();
   const int F = N_half / VEC_NUM;
   aie::vector<int32_t, VEC_NUM> p_vector = aie::broadcast<int32_t, VEC_NUM>(p);
