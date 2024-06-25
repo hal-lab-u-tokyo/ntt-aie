@@ -21,7 +21,7 @@ import aie.utils.trace as trace_utils
 def ntt():
     # AIETile parameters
     n_column = 1
-    n_row = 2
+    n_row = 4
     n_core = n_column * n_row
     buffer_depth = 2
 
@@ -140,7 +140,7 @@ def ntt():
                     core_idx = n_column * c + r
                     for _ in for_(2):
                         # ============================
-                        #    NTT Stage 0 to n-2
+                        #    NTT Stage 0 to n-3
                         # ============================
                         # Acquire
                         elem_buff_local = of_buffs[c][r].acquire(ObjectFifoPort.Produce, 1) 
@@ -154,16 +154,32 @@ def ntt():
                         else:
                             call(ntt_stage_0_to_N_2, [N, N_percore, log2_N_percore, core_idx, elem_in, elem_root, elem_out_next, elem_buff_local, p, barrett_w, barrett_u])
                         
+                        # Write Back
+                        elem_out_local = of_outs_core[c][r].acquire(ObjectFifoPort.Produce, 1)
+                        for i in for_(N_percore//2):
+                            v0 = memref.load(elem_buff_local, [i])
+                            v1 = memref.load(elem_out_next, [i])
+                            if r % 2 == 0:
+                                memref.store(v0, elem_out_local, [i])
+                                memref.store(v1, elem_out_local, [i + N_percore//2])
+                            else:
+                                memref.store(v1, elem_out_local, [i])
+                                memref.store(v0, elem_out_local, [i + N_percore//2])
+                            yield_([])
+                        
                         # Release
+                        of_inroots_core[c].release(ObjectFifoPort.Consume, 1)
                         of_ins_core[c][r].release(ObjectFifoPort.Consume, 1)
+                        of_buffs[c][r].release(ObjectFifoPort.Produce, 1) 
+                        of_outs_core[c][r].release(ObjectFifoPort.Produce, 1)
                         if r % 2 == 0:
                             of_up[c][r//2].release(ObjectFifoPort.Produce, 1)
                         else:
                             of_down[c][r//2].release(ObjectFifoPort.Produce, 1)
-
                         # ============================
-                        #    NTT Stage n-1
+                        #    NTT Stage n-2
                         # ============================
+                        """
                         # Acquire
                         elem_in_next = of_down[c][r//2].acquire(ObjectFifoPort.Consume, 1) if r % 2 == 0 else of_up[c][r//2].acquire(ObjectFifoPort.Consume, 1) 
                         elem_out_next = of_up2[c][r//2].acquire(ObjectFifoPort.Produce, 1) if r % 2 == 0 else of_down2[c][r//2].acquire(ObjectFifoPort.Produce, 1) 
@@ -189,7 +205,6 @@ def ntt():
                         elem_result_fromnext = of_down2[c][r//2].acquire(ObjectFifoPort.Consume, 1) if r % 2 == 0 else of_up2[c][r//2].acquire(ObjectFifoPort.Consume, 1)  
                         for i in for_(N_percore//2):
                             v0 = memref.load(elem_buff_local, [i])
-                            #v0 = arith.constant(11, T.i32())
                             v1 = memref.load(elem_result_fromnext, [i])
                             if r % 2 == 0:
                                 memref.store(v0, elem_out_local, [i])
@@ -205,7 +220,7 @@ def ntt():
                         if r % 2 == 0:
                             of_down2[c][r//2].release(ObjectFifoPort.Consume, 1)
                         else:
-                            of_up2[c][r//2].release(ObjectFifoPort.Consume, 1)
+                            of_up2[c][r//2].release(ObjectFifoPort.Consume, 1)"""
                         yield_([])
                     
         # To/from AIE-array data movement
