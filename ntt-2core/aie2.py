@@ -50,10 +50,10 @@ def ntt():
             "ntt_stage_0_to_N_2",
             inputs=[T.i32(), T.i32(), T.i32(), T.i32(), memRef_ty_core, memRef_ty_vec, memRef_ty_core_half, memRef_ty_core_half, T.i32(), T.i32(), T.i32()],
         )
-        # void ntt_stage_N_1(int32_t N, int32_t *in_a0, int32_t *in_a1, int32_t *in_root, int32_t p, int32_t w, int32_t u) {
+        # void ntt_stage_N_1(int32_t N, int32_t *out0, int32_t *out1, int32_t *in_a0, int32_t *in_a1, int32_t *in_root, int32_t p, int32_t w, int32_t u) {
         ntt_stage_N_1 = external_func(
             "ntt_stage_N_1",
-            inputs=[T.i32(), memRef_ty_core_half, memRef_ty_core_half, memRef_ty_vec, T.i32(), T.i32(), T.i32()],
+            inputs=[T.i32(), memRef_ty_core_half, memRef_ty_core_half, memRef_ty_core_half, memRef_ty_core_half, memRef_ty_vec, T.i32(), T.i32(), T.i32()],
         )
 
         # Tile declarations
@@ -111,6 +111,14 @@ def ntt():
             for r in range(n_row // 2):
                 of_up[c].append(object_fifo(of_up_names[c][r], ComputeTiles[c][2 * r], ComputeTiles[c][2 * r + 1], buffer_depth, memRef_ty_core_half))
                 of_down[c].append(object_fifo(of_down_names[c][r], ComputeTiles[c][2 * r + 1], ComputeTiles[c][2 * r], buffer_depth, memRef_ty_core_half))
+        of_up2 = [[] for c in range(n_column)]
+        of_down2 = [[] for c in range(n_column)]
+        of_up2_names = [[f"up2{c}_{2*r}{2*r+1}" for r in range(n_row//2)] for c in range(n_column)]
+        of_down2_names = [[f"down2{c}_{2*r+1}{2*r}" for r in range(n_row//2)] for c in range(n_column)]
+        for c in range(n_column):
+            for r in range(n_row // 2):
+                of_up2[c].append(object_fifo(of_up2_names[c][r], ComputeTiles[c][2 * r], ComputeTiles[c][2 * r + 1], buffer_depth, memRef_ty_core_half))
+                of_down2[c].append(object_fifo(of_down2_names[c][r], ComputeTiles[c][2 * r + 1], ComputeTiles[c][2 * r], buffer_depth, memRef_ty_core_half))
         
         # Set up a circuit-switched flow from core to shim for tracing information
         if trace_size > 0:
@@ -151,41 +159,38 @@ def ntt():
                         # ============================
                         # Acquire
                         elem_in_next = of_down[c][r//2].acquire(ObjectFifoPort.Consume, 1) if r % 2 == 0 else of_up[c][r//2].acquire(ObjectFifoPort.Consume, 1) 
-
+                        elem_out_next = of_up2[c][r//2].acquire(ObjectFifoPort.Produce, 1) if r % 2 == 0 else of_down2[c][r//2].acquire(ObjectFifoPort.Produce, 1) 
+                        
                         # Call NTT kernel
-                        # void ntt_stage_N_1(int32_t N, int32_t *in_a0, int32_t *in_a1, int32_t *in_root, int32_t p, int32_t w, int32_t u) {
+                        # void ntt_stage_N_1(int32_t N, int32_t *out0, int32_t *out1, int32_t *in_a0, int32_t *in_a1, int32_t *in_root, int32_t p, int32_t w, int32_t u) {
                         if r % 2 == 0:
-                            call(ntt_stage_N_1, [N_percore, elem_out_local, elem_in_next, elem_root, p, barrett_w, barrett_u])
+                            call(ntt_stage_N_1, [N_percore, elem_out_local, elem_out_next, elem_out_local, elem_in_next, elem_root, p, barrett_w, barrett_u])
                         else:
-                            call(ntt_stage_N_1, [N_percore, elem_in_next, elem_out_local, elem_root, p, barrett_w, barrett_u])
+                            call(ntt_stage_N_1, [N_percore, elem_out_next, elem_out_local, elem_in_next, elem_out_local, elem_root, p, barrett_w, barrett_u])
                         
                         # Release
                         of_inroots_core[c].release(ObjectFifoPort.Consume, 1)
                         if r % 2 == 0:
                             of_down[c][r//2].release(ObjectFifoPort.Consume, 1)
-                            of_outs_core[c][r][0].release(ObjectFifoPort.Produce, 1)
+                            of_up2[c][r//2].release(ObjectFifoPort.Produce, 1)
                         else:
                             of_up[c][r//2].release(ObjectFifoPort.Consume, 1)
-                            of_outs_core[c][r][1].release(ObjectFifoPort.Produce, 1)
-
+                            of_down2[c][r//2].release(ObjectFifoPort.Produce, 1)
+                        
                         # Write Back
-                        elem_result_from = of_up[c][r//2].acquire(ObjectFifoPort.Produce, 1) if r % 2 == 0 else of_down[c][r//2].acquire(ObjectFifoPort.Produce, 1) 
-                        idx_result_export = 1 if r % 2 == 0 else 0
+                        elem_result_from = of_down2[c][r//2].acquire(ObjectFifoPort.Consume, 1) if r % 2 == 0 else of_up2[c][r//2].acquire(ObjectFifoPort.Consume, 1) 
                         elem_out_local = of_outs_core[c][r][1].acquire(ObjectFifoPort.Produce, 1) if r % 2 == 0 else of_outs_core[c][r][0].acquire(ObjectFifoPort.Produce, 1) 
                         for i in for_(N//2):
                             v0 = memref.load(elem_result_from, [i])
-                            #v0 = arith.constant(11, T.i32())
                             memref.store(v0, elem_out_local, [i])
                             yield_([])
-                        
                         # Release
+                        of_outs_core[c][r][0].release(ObjectFifoPort.Produce, 1)
+                        of_outs_core[c][r][1].release(ObjectFifoPort.Produce, 1)
                         if r % 2 == 0:
-                            of_up[c][r//2].release(ObjectFifoPort.Produce, 1)
-                            of_outs_core[c][r][1].release(ObjectFifoPort.Produce, 1)
+                            of_down2[c][r//2].release(ObjectFifoPort.Consume, 1)
                         else:
-                            of_down[c][r//2].release(ObjectFifoPort.Produce, 1)
-                            of_outs_core[c][r][0].release(ObjectFifoPort.Produce, 1)
-                        
+                            of_up2[c][r//2].release(ObjectFifoPort.Consume, 1)
                         yield_([])
                     
         # To/from AIE-array data movement

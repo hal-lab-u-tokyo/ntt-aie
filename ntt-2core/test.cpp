@@ -134,7 +134,7 @@ int main(int argc, const char *argv[]) {
   // Compare out to golden
   std::vector<int32_t> answers;
   bool is_answer_file = 1;
-  std::string filename = std::format("../../data/ans_q{}_n{}_stage{}.txt", p, n, n-2);
+  std::string filename = std::format("../../data/ans_q{}_n{}_stage{}.txt", p, n, n-1);
   
   if (is_answer_file){
     std::ifstream ansFile(filename);

@@ -105,12 +105,14 @@ void ntt_stage_parallel8(int32_t N, int32_t core_idx, int32_t *pA1, int32_t *roo
     }
 }
   
-void ntt_stageN_1_parallel8(int32_t N, int32_t *in_a0, int32_t *in_a1, int32_t *in_root, int32_t bf_width, int32_t root_idx, int32_t F, int32_t p, int32_t w, int32_t u){
+void ntt_stageN_1_parallel8(int32_t N, int32_t *out0, int32_t *out1, int32_t *in_a0, int32_t *in_a1, int32_t *in_root, int32_t bf_width, int32_t root_idx, int32_t F, int32_t p, int32_t w, int32_t u){
   for (int i = 0; i < F; i++){
         int32_t cycle = bf_width / VEC_NUM;
         int32_t idx_base = (i / cycle) * bf_width * 2 + (i % cycle) * VEC_NUM;
         int32_t *__restrict pA1_i0 = in_a0 + idx_base;
         int32_t *__restrict pA1_i1 = in_a1 + idx_base;
+        int32_t *__restrict pOut0_i = out0 + idx_base;
+        int32_t *__restrict pOut1_i = out1 + idx_base;
         int32_t root = in_root[root_idx];
         aie::vector<int32_t, VEC_NUM> v0 = aie::load_v<VEC_NUM>(pA1_i0);
         aie::vector<int32_t, VEC_NUM> v1 = aie::load_v<VEC_NUM>(pA1_i1);
@@ -127,21 +129,21 @@ void ntt_stageN_1_parallel8(int32_t N, int32_t *in_a0, int32_t *in_a1, int32_t *
         // barrett_2k(modsub(v0, v1, p), root, p, w, u);
         aie::vector<int32_t, VEC_NUM> barrett = vector_barrett(modsub, p_vector, root_vector, u_vector, w);
             
-        aie::store_v(pA1_i0, modadd);
-        aie::store_v(pA1_i1, barrett);
+        aie::store_v(pOut0_i, modadd);
+        aie::store_v(pOut1_i, barrett);
     }
 }
 
 extern "C" {
 
-void ntt_stage_N_1(int32_t N, int32_t *in_a0, int32_t *in_a1, int32_t *in_root, int32_t p, int32_t w, int32_t u) {
+void ntt_stage_N_1(int32_t N, int32_t *out0, int32_t *out1, int32_t *in_a0, int32_t *in_a1, int32_t *in_root, int32_t p, int32_t w, int32_t u) {
   // Stage N-1
   event0();
   const int N_half = N / 2;
   const int F = N_half / VEC_NUM;
   const int root_idx = 1;
   const int bf_width = N;
-  ntt_stageN_1_parallel8(N, in_a0, in_a1, in_root, bf_width, root_idx, F, p, w, u);
+  ntt_stageN_1_parallel8(N, out0, out1, in_a0, in_a1, in_root, bf_width, root_idx, F, p, w, u);
   event1();
 }
 
