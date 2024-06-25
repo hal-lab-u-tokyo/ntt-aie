@@ -154,19 +154,6 @@ def ntt():
                         else:
                             call(ntt_stage_0_to_N_3, [N, N_percore, log2_N_percore, core_idx, elem_in, elem_root, elem_out_next, elem_buff_local, p, barrett_w, barrett_u])
                         
-                        # Write Back
-                        elem_out_local = of_outs_core[c][r].acquire(ObjectFifoPort.Produce, 1)
-                        for i in for_(N_percore//2):
-                            v0 = memref.load(elem_buff_local, [i])
-                            v1 = memref.load(elem_out_next, [i])
-                            if r % 2 == 0:
-                                memref.store(v0, elem_out_local, [i])
-                                memref.store(v1, elem_out_local, [i + N_percore//2])
-                            else:
-                                memref.store(v1, elem_out_local, [i])
-                                memref.store(v0, elem_out_local, [i + N_percore//2])
-                            yield_([])
-                        
                         # Release
                         of_ins_core[c][r].release(ObjectFifoPort.Consume, 1)
                         if r % 2 == 0:
@@ -196,6 +183,15 @@ def ntt():
                         else:
                             of_up[c][r//2].release(ObjectFifoPort.Consume, 1)
                             of_down2[c][r//2].release(ObjectFifoPort.Produce, 1)
+
+                        # Write Back
+
+                        # ============================
+                        #    NTT Stage n-1
+                        # ============================
+                        # Acquire
+
+                        # Call NTT kernel
                         
                         # Write Back
                         elem_out_local = of_outs_core[c][r].acquire(ObjectFifoPort.Produce, 1)
