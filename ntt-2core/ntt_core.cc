@@ -104,16 +104,58 @@ void ntt_stage_parallel8(int32_t N, int32_t core_idx, int32_t *pA1, int32_t *roo
         aie::store_v(pA1_i + bf_width, barrett);
     }
 }
+  
+void ntt_stageN_1_parallel8(int32_t N, int32_t *in_a0, int32_t *in_a1, int32_t *in_root, int32_t bf_width, int32_t root_idx, int32_t F, int32_t p, int32_t w, int32_t u){
+  for (int i = 0; i < F; i++){
+        int32_t cycle = bf_width / VEC_NUM;
+        int32_t idx_base = (i / cycle) * bf_width * 2 + (i % cycle) * VEC_NUM;
+        int32_t *__restrict pA1_i0 = in_a0 + idx_base;
+        int32_t *__restrict pA1_i1 = in_a1 + idx_base;
+        int32_t root = in_root[root_idx];
+        aie::vector<int32_t, VEC_NUM> v0 = aie::load_v<VEC_NUM>(pA1_i0);
+        aie::vector<int32_t, VEC_NUM> v1 = aie::load_v<VEC_NUM>(pA1_i1);
+        aie::vector<int32_t, VEC_NUM> p_vector = aie::broadcast<int32_t, VEC_NUM>(p);
+        aie::vector<int32_t, VEC_NUM> root_vector = aie::broadcast<int32_t, VEC_NUM>(root);
+        aie::vector<int32_t, VEC_NUM> u_vector = aie::broadcast<int32_t, VEC_NUM>(u);
+       
+        // modadd(v0, v1, p)
+        aie::vector<int32_t, VEC_NUM> modadd = vector_modadd(v0, v1, p_vector);
+
+        // modsub(v0, v1, p)
+        aie::vector<int32_t, VEC_NUM> modsub = vector_modsub(v0, v1, p_vector);
+        
+        // barrett_2k(modsub(v0, v1, p), root, p, w, u);
+        aie::vector<int32_t, VEC_NUM> barrett = vector_barrett(modsub, p_vector, root_vector, u_vector, w);
+            
+        aie::store_v(pA1_i0, modadd);
+        aie::store_v(pA1_i1, barrett);
+    }
+}
 
 extern "C" {
 
-void ntt_stage0_to_Nminus5(int32_t N_all, int32_t N, int32_t logN, int32_t core_idx, int32_t *a_in, int32_t *root_in, int32_t *c_out0, int32_t *c_out1, int32_t p, int32_t w, int32_t u) {
-  const int N_half = N/ 2;
+void ntt_stage_N_1(int32_t N, int32_t *out_c0, int32_t *out_c1, int32_t *in_a0, int32_t *in_a1, int32_t *in_root, int32_t p, int32_t w, int32_t u) {
+  // Stage N-1
+  event0();
+  const int N_half = N / 2;
+  const int F = N_half / VEC_NUM;
+  const int root_idx = 1;
+  const int bf_width = N;
+  ntt_stageN_1_parallel8(N, in_a0, in_a1, in_root, bf_width, root_idx, F, p, w, u);
+  event1();
+
+  // Write back
+  for (int i = 0; i < N_half; i++){
+    out_c0[i] = in_a0[i];  
+    out_c1[i] = in_a1[i];
+  }
+}
+
+void ntt_stage_0_to_N_2(int32_t N_all, int32_t N, int32_t logN, int32_t core_idx, int32_t *a_in, int32_t *root_in, int32_t *c_out0, int32_t *c_out1, int32_t p, int32_t w, int32_t u) {
+  const int N_half = N / 2;
   int32_t root_idx = N_all / 2;
   int32_t bf_width = 1;
-  int32_t vec_prime = 1;
   int32_t cycle = 1;
-  int32_t F = N_half / vec_prime;
   int32_t *__restrict pA1 = a_in;
   int32_t *__restrict pRoot = root_in;
   
@@ -160,18 +202,16 @@ void ntt_stage0_to_Nminus5(int32_t N_all, int32_t N, int32_t logN, int32_t core_
   }
   event1();
 
-  // Stage 3 to Stage N-1
+  // Stage 3 to Stage N-2
   event0();
-  vec_prime = 8;
-  F = N_half / vec_prime;
+  const int F = N_half / VEC_NUM;
   for (int stage = 3; stage < logN; stage++){
     bf_width *= 2;
     root_idx /= 2;
     ntt_stage_parallel8(N, core_idx, a_in, root_in, bf_width, root_idx, F, p, w, u);     
   }
   event1();
-/*
-*/
+
   // Write back
   for (int i = 0; i < N_half; i++){
     c_out0[i] = a_in[i];  

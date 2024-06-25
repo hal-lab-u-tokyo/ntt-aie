@@ -47,7 +47,7 @@ def ntt():
         # AIE Core Function declarations
         # void ntt_stage0_to_Nminus5(int32_t N_all, int32_t N, int32_t logN, int32_t core_idx, int32_t *a_in, int32_t *root_in, int32_t *c_out, int32_t p, int32_t w, int32_t u) {
         ntt_core = external_func(
-            "ntt_stage0_to_Nminus5",
+            "ntt_stage_0_to_N_2",
             inputs=[T.i32(), T.i32(), T.i32(), T.i32(), memRef_ty_core, memRef_ty_vec, memRef_ty_core_half, memRef_ty_core_half, T.i32(), T.i32(), T.i32()],
         )
 
@@ -145,11 +145,15 @@ def ntt():
                         # Acquire
                         elem_out_sec_local = of_outs_core[c][r][1].acquire(ObjectFifoPort.Produce, 1)
                         elem_in_sec_fromnext = of_down[c][r//2].acquire(ObjectFifoPort.Consume, 1) if r % 2 == 0 else of_up[c][r//2].acquire(ObjectFifoPort.Consume, 1) 
+
                         # Call NTT kernel
+
+                        # Write Back
                         for i in for_(N//2):
                             v0 = memref.load(elem_in_sec_fromnext, [i])
                             memref.store(v0, elem_out_sec_local, [i])
                             yield_([])
+                        
                         # Release
                         of_outs_core[c][r][1].release(ObjectFifoPort.Produce, 1)
                         if r % 2 == 0:
