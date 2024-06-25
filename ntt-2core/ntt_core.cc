@@ -134,7 +134,7 @@ void ntt_stageN_1_parallel8(int32_t N, int32_t *in_a0, int32_t *in_a1, int32_t *
 
 extern "C" {
 
-void ntt_stage_N_1(int32_t N, int32_t *out_c0, int32_t *out_c1, int32_t *in_a0, int32_t *in_a1, int32_t *in_root, int32_t p, int32_t w, int32_t u) {
+void ntt_stage_N_1(int32_t N, int32_t *in_a0, int32_t *in_a1, int32_t *in_root, int32_t p, int32_t w, int32_t u) {
   // Stage N-1
   event0();
   const int N_half = N / 2;
@@ -143,12 +143,6 @@ void ntt_stage_N_1(int32_t N, int32_t *out_c0, int32_t *out_c1, int32_t *in_a0, 
   const int bf_width = N;
   ntt_stageN_1_parallel8(N, in_a0, in_a1, in_root, bf_width, root_idx, F, p, w, u);
   event1();
-
-  // Write back
-  for (int i = 0; i < N_half; i++){
-    out_c0[i] = in_a0[i];  
-    out_c1[i] = in_a1[i];
-  }
 }
 
 void ntt_stage_0_to_N_2(int32_t N_all, int32_t N, int32_t logN, int32_t core_idx, int32_t *a_in, int32_t *root_in, int32_t *c_out0, int32_t *c_out1, int32_t p, int32_t w, int32_t u) {

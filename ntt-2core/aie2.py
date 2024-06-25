@@ -45,10 +45,15 @@ def ntt():
         memRef_ty_scalar = T.memref(1, T.i32())
         
         # AIE Core Function declarations
-        # void ntt_stage0_to_Nminus5(int32_t N_all, int32_t N, int32_t logN, int32_t core_idx, int32_t *a_in, int32_t *root_in, int32_t *c_out, int32_t p, int32_t w, int32_t u) {
-        ntt_core = external_func(
+        # void ntt_stage_0_to_N_2(int32_t N_all, int32_t N, int32_t logN, int32_t core_idx, int32_t *a_in, int32_t *root_in, int32_t *c_out0, int32_t *c_out1, int32_t p, int32_t w, int32_t u) {
+        ntt_stage_0_to_N_2 = external_func(
             "ntt_stage_0_to_N_2",
             inputs=[T.i32(), T.i32(), T.i32(), T.i32(), memRef_ty_core, memRef_ty_vec, memRef_ty_core_half, memRef_ty_core_half, T.i32(), T.i32(), T.i32()],
+        )
+        # void ntt_stage_N_1(int32_t N, int32_t *in_a0, int32_t *in_a1, int32_t *in_root, int32_t p, int32_t w, int32_t u) {
+        ntt_stage_N_1 = external_func(
+            "ntt_stage_N_1",
+            inputs=[T.i32(), memRef_ty_core_half, memRef_ty_core_half, memRef_ty_vec, T.i32(), T.i32(), T.i32()],
         )
 
         # Tile declarations
@@ -123,43 +128,60 @@ def ntt():
                         #    NTT Stage 0 to n-2
                         # ============================
                         # Acquire
-                        elem_out_fir = of_outs_core[c][r][0].acquire(ObjectFifoPort.Produce, 1)
-                        elem_out_sec_tonext = of_up[c][r//2].acquire(ObjectFifoPort.Produce, 1) if r % 2 == 0 else of_down[c][r//2].acquire(ObjectFifoPort.Produce, 1) 
+                        elem_out_local = of_outs_core[c][r][0].acquire(ObjectFifoPort.Produce, 1) if r % 2 == 0 else of_outs_core[c][r][1].acquire(ObjectFifoPort.Produce, 1) 
+                        elem_out_next = of_up[c][r//2].acquire(ObjectFifoPort.Produce, 1) if r % 2 == 0 else of_down[c][r//2].acquire(ObjectFifoPort.Produce, 1) 
                         elem_in = of_ins_core[c][r].acquire(ObjectFifoPort.Consume, 1)
                         elem_root = of_inroots_core[c].acquire(ObjectFifoPort.Consume, 1)
+                        
                         # Call NTT kernel
-                        # void ntt_stage0_to_Nminus5(int32_t N_all, int32_t N, int32_t logN, int32_t core_idx, int32_t *a_in, int32_t *root_in, int32_t *c_out, int32_t p, int32_t w, int32_t u) {
-                        call(ntt_core, [N, N_percore, log2_N_percore, core_idx, elem_in, elem_root, elem_out_fir, elem_out_sec_tonext, p, barrett_w, barrett_u])
+                        if r % 2 == 0:
+                            call(ntt_stage_0_to_N_2, [N, N_percore, log2_N_percore, core_idx, elem_in, elem_root, elem_out_local, elem_out_next, p, barrett_w, barrett_u])
+                        else:
+                            call(ntt_stage_0_to_N_2, [N, N_percore, log2_N_percore, core_idx, elem_in, elem_root, elem_out_next, elem_out_local, p, barrett_w, barrett_u])
+                        
                         # Release
-                        of_inroots_core[c].release(ObjectFifoPort.Consume, 1)
                         of_ins_core[c][r].release(ObjectFifoPort.Consume, 1)
                         if r % 2 == 0:
                             of_up[c][r//2].release(ObjectFifoPort.Produce, 1)
                         else:
                             of_down[c][r//2].release(ObjectFifoPort.Produce, 1)
-                        of_outs_core[c][r][0].release(ObjectFifoPort.Produce, 1)
 
                         # ============================
                         #    NTT Stage n-1
                         # ============================
                         # Acquire
-                        elem_out_sec_local = of_outs_core[c][r][1].acquire(ObjectFifoPort.Produce, 1)
-                        elem_in_sec_fromnext = of_down[c][r//2].acquire(ObjectFifoPort.Consume, 1) if r % 2 == 0 else of_up[c][r//2].acquire(ObjectFifoPort.Consume, 1) 
+                        elem_in_next = of_down[c][r//2].acquire(ObjectFifoPort.Consume, 1) if r % 2 == 0 else of_up[c][r//2].acquire(ObjectFifoPort.Consume, 1) 
 
                         # Call NTT kernel
-
-                        # Write Back
-                        for i in for_(N//2):
-                            v0 = memref.load(elem_in_sec_fromnext, [i])
-                            memref.store(v0, elem_out_sec_local, [i])
-                            yield_([])
+                        # void ntt_stage_N_1(int32_t N, int32_t *in_a0, int32_t *in_a1, int32_t *in_root, int32_t p, int32_t w, int32_t u) {
+                        if r % 2 == 0:
+                            call(ntt_stage_N_1, [N_percore, elem_out_local, elem_in_next, elem_root,  p, barrett_w, barrett_u])
+                        else:
+                            call(ntt_stage_N_1, [N_percore, elem_in_next, elem_out_local, elem_root,  p, barrett_w, barrett_u])
                         
                         # Release
-                        of_outs_core[c][r][1].release(ObjectFifoPort.Produce, 1)
+                        of_inroots_core[c].release(ObjectFifoPort.Consume, 1)
                         if r % 2 == 0:
                             of_down[c][r//2].release(ObjectFifoPort.Consume, 1)
                         else:
                             of_up[c][r//2].release(ObjectFifoPort.Consume, 1)
+
+                        # Write Back
+                        elem_result_from = of_up[c][r//2].acquire(ObjectFifoPort.Produce, 1) if r % 2 == 0 else of_down[c][r//2].acquire(ObjectFifoPort.Produce, 1) 
+                        idx_result_export = 1 if r % 2 == 0 else 0
+                        elem_result_write = of_outs_core[c][r][idx_result_export].acquire(ObjectFifoPort.Produce, 1)
+                        for i in for_(N//2):
+                            v0 = memref.load(elem_result_from, [i])
+                            memref.store(v0, elem_result_write, [i])
+                            yield_([])
+                        
+                        # Release
+                        of_outs_core[c][r][idx_result_export].release(ObjectFifoPort.Produce, 1)
+                        if r % 2 == 0:
+                            of_up[c][r//2].release(ObjectFifoPort.Produce, 1)
+                        else:
+                            of_down[c][r//2].release(ObjectFifoPort.Produce, 1)
+                        
                         yield_([])
                     
         # To/from AIE-array data movement
