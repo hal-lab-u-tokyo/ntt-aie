@@ -155,32 +155,36 @@ def ntt():
                         # Call NTT kernel
                         # void ntt_stage_N_1(int32_t N, int32_t *in_a0, int32_t *in_a1, int32_t *in_root, int32_t p, int32_t w, int32_t u) {
                         if r % 2 == 0:
-                            call(ntt_stage_N_1, [N_percore, elem_out_local, elem_in_next, elem_root,  p, barrett_w, barrett_u])
+                            call(ntt_stage_N_1, [N_percore, elem_out_local, elem_in_next, elem_root, p, barrett_w, barrett_u])
                         else:
-                            call(ntt_stage_N_1, [N_percore, elem_in_next, elem_out_local, elem_root,  p, barrett_w, barrett_u])
+                            call(ntt_stage_N_1, [N_percore, elem_in_next, elem_out_local, elem_root, p, barrett_w, barrett_u])
                         
                         # Release
                         of_inroots_core[c].release(ObjectFifoPort.Consume, 1)
                         if r % 2 == 0:
                             of_down[c][r//2].release(ObjectFifoPort.Consume, 1)
+                            of_outs_core[c][r][0].release(ObjectFifoPort.Produce, 1)
                         else:
                             of_up[c][r//2].release(ObjectFifoPort.Consume, 1)
+                            of_outs_core[c][r][1].release(ObjectFifoPort.Produce, 1)
 
                         # Write Back
                         elem_result_from = of_up[c][r//2].acquire(ObjectFifoPort.Produce, 1) if r % 2 == 0 else of_down[c][r//2].acquire(ObjectFifoPort.Produce, 1) 
                         idx_result_export = 1 if r % 2 == 0 else 0
-                        elem_result_write = of_outs_core[c][r][idx_result_export].acquire(ObjectFifoPort.Produce, 1)
+                        elem_out_local = of_outs_core[c][r][1].acquire(ObjectFifoPort.Produce, 1) if r % 2 == 0 else of_outs_core[c][r][0].acquire(ObjectFifoPort.Produce, 1) 
                         for i in for_(N//2):
                             v0 = memref.load(elem_result_from, [i])
-                            memref.store(v0, elem_result_write, [i])
+                            #v0 = arith.constant(11, T.i32())
+                            memref.store(v0, elem_out_local, [i])
                             yield_([])
                         
                         # Release
-                        of_outs_core[c][r][idx_result_export].release(ObjectFifoPort.Produce, 1)
                         if r % 2 == 0:
                             of_up[c][r//2].release(ObjectFifoPort.Produce, 1)
+                            of_outs_core[c][r][1].release(ObjectFifoPort.Produce, 1)
                         else:
                             of_down[c][r//2].release(ObjectFifoPort.Produce, 1)
+                            of_outs_core[c][r][0].release(ObjectFifoPort.Produce, 1)
                         
                         yield_([])
                     
