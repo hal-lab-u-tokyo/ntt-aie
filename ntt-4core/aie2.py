@@ -50,10 +50,10 @@ def ntt():
             "ntt_stage_0_to_N_3",
             inputs=[T.i32(), T.i32(), T.i32(), T.i32(), memRef_ty_core, memRef_ty_vec, memRef_ty_core_half, memRef_ty_core_half, T.i32(), T.i32(), T.i32()],
         )
-        # void ntt_stage_N_1(int32_t N, int32_t *out0, int32_t *out1, int32_t *in_a0, int32_t *in_a1, int32_t *in_root, int32_t p, int32_t w, int32_t u) {
+        # void ntt_stage_N_2(int32_t N, int32_t core_idx, int32_t *out0, int32_t *out1, int32_t *in0, int32_t *in1, int32_t *in_root, int32_t p, int32_t w, int32_t u) {
         ntt_stage_N_2 = external_func(
             "ntt_stage_N_2",
-            inputs=[T.i32(), memRef_ty_core_half, memRef_ty_core_half, memRef_ty_core_half, memRef_ty_core_half, memRef_ty_vec, T.i32(), T.i32(), T.i32()],
+            inputs=[T.i32(), T.i32(), T.i32(), memRef_ty_core_half, memRef_ty_core_half, memRef_ty_core_half, memRef_ty_core_half, memRef_ty_vec, T.i32(), T.i32(), T.i32()],
         )
 
         # Tile declarations
@@ -184,9 +184,9 @@ def ntt():
                         # Call NTT kernel
                         # void ntt_stage_N_1(int32_t N, int32_t *out0, int32_t *out1, int32_t *in_a0, int32_t *in_a1, int32_t *in_root, int32_t p, int32_t w, int32_t u) {
                         if r % 2 == 0:
-                            call(ntt_stage_N_2, [N_percore, elem_buff_local, elem_out_next, elem_buff_local, elem_in_next, elem_root, p, barrett_w, barrett_u])
+                            call(ntt_stage_N_2, [N_percore, core_idx, n_core, elem_buff_local, elem_out_next, elem_buff_local, elem_in_next, elem_root, p, barrett_w, barrett_u])
                         else:
-                            call(ntt_stage_N_2, [N_percore, elem_out_next, elem_buff_local, elem_in_next, elem_buff_local, elem_root, p, barrett_w, barrett_u])
+                            call(ntt_stage_N_2, [N_percore, core_idx, n_core, elem_out_next, elem_buff_local, elem_in_next, elem_buff_local, elem_root, p, barrett_w, barrett_u])
                         
                         # Release
                         of_inroots_core[c].release(ObjectFifoPort.Consume, 1)

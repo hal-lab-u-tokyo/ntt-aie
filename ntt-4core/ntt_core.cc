@@ -99,15 +99,14 @@ void ntt_stage_parallel8_internal(int32_t *out_ptr0, int32_t *out_ptr1, int32_t 
 
 extern "C" {
 
-void ntt_stage_N_2(int32_t N, int32_t *out0, int32_t *out1, int32_t *in0, int32_t *in1, int32_t *in_root, int32_t p, int32_t w, int32_t u) {
+void ntt_stage_N_2(int32_t N, int32_t core_idx, int32_t n_core, int32_t *out0, int32_t *out1, int32_t *in0, int32_t *in1, int32_t *in_root, int32_t p, int32_t w, int32_t u) {
   // Stage N-2
   event0();
   const int N_half = N / 2;
   const int F = N_half / VEC_NUM;
-  const int root_idx = 1;
-  const int bf_width = N;
+  const int root_idx = (core_idx >= n_core / 2) ? 3 : 2;
+  const int bf_width = N / 2;
   int32_t root = in_root[root_idx];
-  aie::vector<int32_t, VEC_NUM> root_vector = aie::broadcast<int32_t, VEC_NUM>(root);
   aie::vector<int32_t, VEC_NUM> p_vector = aie::broadcast<int32_t, VEC_NUM>(p);
   aie::vector<int32_t, VEC_NUM> u_vector = aie::broadcast<int32_t, VEC_NUM>(u);
   for (int i = 0; i < F; i++){
