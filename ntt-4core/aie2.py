@@ -274,8 +274,7 @@ def ntt():
                             3: of_buffs[c][r]
                         }
                         elem_in0 = sw_elem_in0.get(r).acquire(ObjectFifoPort.Consume, 1) if r != 1 else sw_elem_in0.get(r).acquire(ObjectFifoPort.Produce, 1) 
-                        elem_in1 = sw_elem_in1.get(r).acquire(ObjectFifoPort.Consume, 1) if r != 2 else sw_elem_in1.get(r).acquire(ObjectFifoPort.Produce, 1) 
-                        
+                        elem_in1 = sw_elem_in1.get(r).acquire(ObjectFifoPort.Consume, 1) if r != 2 else sw_elem_in1.get(r).acquire(ObjectFifoPort.Produce, 1)     
                         
                         # Write Back
                         elem_out_local = of_outs_core[c][r].acquire(ObjectFifoPort.Produce, 1)

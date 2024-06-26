@@ -132,7 +132,8 @@ int main(int argc, const char *argv[]) {
   bo_outC.sync(XCL_BO_SYNC_BO_FROM_DEVICE);
 
   // Compare out to golden
-  std::vector<int32_t> answers;
+  std::vector<int32_t> answers_input;
+  std::vector<int32_t> answers(IN_VOLUME);
   bool is_answer_file = 1;
   std::string filename = std::format("../../data/ans_q{}_n{}_stage{}.txt", p, n, n-2);
   
@@ -144,7 +145,18 @@ int main(int argc, const char *argv[]) {
     }
     int ans;
     while (ansFile >> ans) {
-        answers.push_back(ans);
+        answers_input.push_back(ans);
+    }
+    for (int i = 0; i < IN_VOLUME; i++){
+      std::cout << "answers_input[" << i << "] = " << answers_input[i] << std::endl;
+    }
+    std::array<int, 8> base = {0, 2, 4, 6, 1, 3, 5, 7};
+    int block_size = IN_VOLUME/8;
+    for (int i = 0; i < 8; i++){
+      int base_i = base[i] * block_size;
+      for (int j = 0; j < block_size; j++){
+        answers[base_i + j] = answers_input[i * block_size + j];
+      }
     }
   }else {
     int n_column = 1;
