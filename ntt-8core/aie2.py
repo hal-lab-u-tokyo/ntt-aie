@@ -364,6 +364,13 @@ def ntt():
                             yield_([])
 
                         # Call NTT kernel
+                        if c == 1:
+                            for i in for_(N_percore//2):
+                                v0 = memref.load(buffs[c-1][r], [i])
+                                v1 = arith.addi(v0, v0)
+                                memref.store(v1, buffs[c-1][r], [i])
+                                yield_([])
+
                         # Release
 
                         # Write Back
