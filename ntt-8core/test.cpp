@@ -142,9 +142,10 @@ int main(int argc, const char *argv[]) {
     while (ansFile >> ans) {
         answers_input.push_back(ans);
     }
-    std::array<int, 8> base = {0, 2, 1, 3, 4, 6, 5, 7};
-    int block_size = IN_VOLUME / 8;
-    for (int i = 0; i < 8; i++){
+    const int block_num = 8;
+    std::array<int, block_num> base = {0, 2, 1, 3, 4, 6, 5, 7};
+    int block_size = IN_VOLUME / block_num;
+    for (int i = 0; i < block_num; i++){
       int base_i = base[i] * block_size;
       for (int j = 0; j < block_size; j++){
         answers[base_i + j] = answers_input[i * block_size + j];
@@ -172,7 +173,7 @@ int main(int argc, const char *argv[]) {
     int32_t ref = answers[i];
     int32_t test = bufOut[i];
     if (test != ref) {
-      //std::cout << "[" << i << "] Error: (get vs expected) = " << test << " != " << ref << std::endl;
+      std::cout << "[" << i << "] Error: (get vs expected) = " << test << " != " << ref << std::endl;
       errors++;
     } else {
       std::cout << "[" << i << "] Correct " << test << " == " << ref << std::endl;
