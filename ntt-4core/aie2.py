@@ -275,33 +275,81 @@ def ntt():
                         # r == 3: of_down[2], local
                         sw_elem_in0 = {
                             0: of_buffs[c][0],
-                            1: of_down2[c][0],
+                            1: of_down2[c][0], #*
                             2: of_up2[c][1],
                             3: of_up[c][2]
                         }
                         sw_elem_in1 = {
                             0: of_down[c][0],
                             1: of_down2[c][1],
-                            2: of_up2[c][2],
+                            2: of_up2[c][2], #*
                             3: of_buffs[c][r]
+                        }
+                        sw_elem_out0 = {
+                            0: of_buffs[c][0],
+                            1: of_down[c][0],
+                            2: of_buffs[c][2],
+                            3: of_down[c][2]
+                        }
+                        sw_elem_out1 = {
+                            0: of_up[c][0],
+                            1: of_buffs[c][1],
+                            2: of_up[c][2],
+                            3: of_buffs[c][3]
                         }
                         elem_in0 = sw_elem_in0.get(r).acquire(ObjectFifoPort.Consume, 1) if r != 1 else sw_elem_in0.get(r).acquire(ObjectFifoPort.Produce, 1) 
                         elem_in1 = sw_elem_in1.get(r).acquire(ObjectFifoPort.Consume, 1) if r != 2 else sw_elem_in1.get(r).acquire(ObjectFifoPort.Produce, 1)     
+                        elem_out0 = sw_elem_out0.get(r).acquire(ObjectFifoPort.Produce, 1)
+                        elem_out1 = sw_elem_out1.get(r).acquire(ObjectFifoPort.Produce, 1)
                         
+                        # Call NTT kernel
+                        # void ntt_stage_N_1(int32_t N, int32_t core_idx, int32_t n_core, int32_t *out0, int32_t *out1, int32_t *in0, int32_t *in1, int32_t *in_root, int32_t p, int32_t w, int32_t u) {
+                        call(ntt_stage_N_1, [N_percore, core_idx, n_core, elem_out0, elem_out1, elem_in0, elem_in1, elem_root, p, barrett_w, barrett_u])
+                        
+                        # Release
+                        if r == 0:
+                            sw_elem_in1.get(r).release(ObjectFifoPort.Consume, 1) 
+                            sw_elem_out1.get(r).release(ObjectFifoPort.Produce, 1)
+                        elif r == 1:
+                            sw_elem_in0.get(r).release(ObjectFifoPort.Produce, 1)
+                            sw_elem_in1.get(r).release(ObjectFifoPort.Consume, 1) 
+                            sw_elem_out0.get(r).release(ObjectFifoPort.Produce, 1)
+                        elif r == 2:
+                            sw_elem_in0.get(r).release(ObjectFifoPort.Consume, 1) 
+                            sw_elem_in1.get(r).release(ObjectFifoPort.Produce, 1) 
+                            sw_elem_out1.get(r).release(ObjectFifoPort.Produce, 1)
+                        elif r == 3:
+                            sw_elem_in0.get(r).release(ObjectFifoPort.Consume, 1) 
+                            sw_elem_out0.get(r).release(ObjectFifoPort.Produce, 1)
+
                         # Write Back
+                        sw_result0 = {
+                            0: of_buffs[c][0],
+                            1: of_up[c][0],
+                            2: of_buffs[c][2],
+                            3: of_up[c][2]
+                        }
+                        sw_result1 = {
+                            0: of_down[c][0],
+                            1: of_buffs[c][1],
+                            2: of_down[c][2],
+                            3: of_buffs[c][3]
+                        }
+                        if r % 2 == 0:
+                            elem_out1 = sw_result1.get(r).acquire(ObjectFifoPort.Consume, 1) 
+                        else:
+                            elem_out0 = sw_result0.get(r).acquire(ObjectFifoPort.Consume, 1) 
                         elem_out_local = of_outs_core[c][r].acquire(ObjectFifoPort.Produce, 1)
                         for i in for_(N_percore//2):
-                            #v0 = arith.constant(11, T.i32())
-                            v0 = memref.load(elem_in0, [i])
-                            v1 = memref.load(elem_in1, [i])
+                            v0 = memref.load(elem_out0, [i])
+                            v1 = memref.load(elem_out1, [i])
                             memref.store(v0, elem_out_local, [i])
                             memref.store(v1, elem_out_local, [i + N_percore // 2])
                             yield_([])
                         
-                        
-                        sw_elem_in0.get(r).release(ObjectFifoPort.Consume, 1) if r != 1 else sw_elem_in0.get(r).release(ObjectFifoPort.Produce, 1) 
-                        sw_elem_in1.get(r).release(ObjectFifoPort.Consume, 1) if r != 2 else sw_elem_in1.get(r).release(ObjectFifoPort.Produce, 1) 
                         of_outs_core[c][r].release(ObjectFifoPort.Produce, 1)
+                        sw_result0.get(r).release(ObjectFifoPort.Consume, 1) 
+                        sw_result1.get(r).release(ObjectFifoPort.Consume, 1) 
 
                         """
 
