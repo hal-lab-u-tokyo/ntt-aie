@@ -128,6 +128,23 @@ def ntt():
                 of_up2[c].append(object_fifo(of_up2_names[c][r], ComputeTiles[c][r], ComputeTiles[c][r + 1], buffer_depth, memRef_ty_core_half))
                 of_down2[c].append(object_fifo(of_down2_names[c][r], ComputeTiles[c][r + 1], ComputeTiles[c][r], buffer_depth, memRef_ty_core_half))
         
+        """
+        of_right = [[] for c in range(n_column - 1)]
+        of_left = [[] for c in range(n_column - 1)]
+        of_right_names = [[f"right{c}{r}_{c+1}{r}" for r in range(0, n_row)] for c in range(n_column - 1)]
+        of_left_names = [[f"left{c+1}{r}_{c}{r}" for r in range(0, n_row)] for c in range(n_column - 1)]
+        for c in range(n_column - 1):
+            for r in range(n_row):
+                of_right[c].append(object_fifo(of_right_names[c][r], ComputeTiles[c][r], ComputeTiles[c+1][r], buffer_depth, memRef_ty_core_half))
+                of_left[c].append(object_fifo(of_left_names[c][r], ComputeTiles[c+1][r], ComputeTiles[c][r], buffer_depth, memRef_ty_core_half))
+        """
+        # Buffer
+        buffs = [[] for c in range(n_column)]
+        for i in range(0, n_column):
+            for j in range(0, n_row):
+                buffs[i].append(Buffer(ComputeTiles[i][j], [N_percore], T.i32(), f"buffComputeTile{i}{j+2}"))
+
+        
         # Set up a circuit-switched flow from core to shim for tracing information
         if trace_size > 0:
             flow(ComputeTiles[0][0], WireBundle.Trace, 0, ShimTiles[0], WireBundle.DMA, 1)
@@ -257,8 +274,6 @@ def ntt():
                         #    NTT Stage n-2
                         # ============================
                         # Acquire
-
-                        # Call NTT kernel
                         # In
                         # r == 0: *local, of_down[c][0]
                         # r == 1: *of_down2[c][0], of_down2[c][1]
@@ -317,8 +332,11 @@ def ntt():
                         elif r == 3:
                             sw_elem_in0.get(r).release(ObjectFifoPort.Consume, 1) 
                             sw_elem_out0.get(r).release(ObjectFifoPort.Produce, 1)
-
-                        # Write Back
+                        
+                        # ============================
+                        #    NTT Stage n-1
+                        # ============================
+                        # Acquire
                         sw_result0 = {
                             0: of_buffs[c][0],
                             1: of_up[c][0],
@@ -335,14 +353,25 @@ def ntt():
                             elem_out1 = sw_result1.get(r).acquire(ObjectFifoPort.Consume, 1) 
                         else:
                             elem_out0 = sw_result0.get(r).acquire(ObjectFifoPort.Consume, 1) 
-                        elem_out_local = of_outs_core[c][r].acquire(ObjectFifoPort.Produce, 1)
+
+                        # TODO: remove
+                        # Copy to Buff
                         for i in for_(N_percore//2):
                             v0 = memref.load(elem_out0, [i])
                             v1 = memref.load(elem_out1, [i])
-                            memref.store(v0, elem_out_local, [i])
-                            memref.store(v1, elem_out_local, [i + N_percore // 2])
+                            memref.store(v0, buffs[c][r], [i])
+                            memref.store(v1, buffs[c][r], [i + N_percore // 2])
                             yield_([])
-                        
+
+                        # Call NTT kernel
+                        # Release
+
+                        # Write Back
+                        elem_out_local = of_outs_core[c][r].acquire(ObjectFifoPort.Produce, 1)
+                        for i in for_(N_percore):
+                            v0 = memref.load(buffs[c][r], [i])
+                            memref.store(v0, elem_out_local, [i])
+                            yield_([])
                         of_outs_core[c][r].release(ObjectFifoPort.Produce, 1)
                         sw_result0.get(r).release(ObjectFifoPort.Consume, 1) 
                         sw_result1.get(r).release(ObjectFifoPort.Consume, 1) 
