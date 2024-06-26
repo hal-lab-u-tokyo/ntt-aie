@@ -92,11 +92,6 @@ int main(int argc, const char *argv[]) {
   std::vector<int32_t> root(IN_VOLUME);
   root[0] = 1;
   make_roots(IN_VOLUME, root, p, g);
-  std::cout << "roots: ";
-  for (int i = 0; i < IN_VOLUME; i++){
-      std::cout << root[i] << " ";
-  }
-  std::cout << std::endl;
   
   // Initialize buffer
   int32_t *bufInA = bo_inA.map<int32_t *>();
@@ -146,9 +141,6 @@ int main(int argc, const char *argv[]) {
     int ans;
     while (ansFile >> ans) {
         answers_input.push_back(ans);
-    }
-    for (int i = 0; i < IN_VOLUME; i++){
-      std::cout << "answers_input[" << i << "] = " << answers_input[i] << std::endl;
     }
     std::array<int, 8> base = {0, 1, 4, 5, 2, 3, 6, 7};
     int block_size = IN_VOLUME/8;
