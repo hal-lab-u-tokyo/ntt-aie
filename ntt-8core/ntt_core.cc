@@ -103,7 +103,6 @@ void ntt_1stage(int32_t idx_stage, int32_t N, int32_t core_idx, int32_t n_core, 
   // idx_stage : 0, 1, 2, ...
   event0();
   const int N_half = N / 2;
-  const int bf_width = N / (idx_stage + 1);
   const int F = N_half / VEC_NUM;
   const int root_base = 1 << idx_stage;
   const int root_num = 1 << idx_stage;
@@ -113,8 +112,7 @@ void ntt_1stage(int32_t idx_stage, int32_t N, int32_t core_idx, int32_t n_core, 
   aie::vector<int32_t, VEC_NUM> p_vector = aie::broadcast<int32_t, VEC_NUM>(p);
   aie::vector<int32_t, VEC_NUM> u_vector = aie::broadcast<int32_t, VEC_NUM>(u);
   for (int i = 0; i < F; i++){
-    int32_t cycle = bf_width / VEC_NUM;
-    int32_t idx_base = (i / cycle) * bf_width * 2 + (i % cycle) * VEC_NUM;
+    int32_t idx_base = i * VEC_NUM;
     int32_t *__restrict pIn0_i = in0 + idx_base;
     int32_t *__restrict pIn1_i = in1 + idx_base;
     int32_t *__restrict pOut0_i = out0 + idx_base;
