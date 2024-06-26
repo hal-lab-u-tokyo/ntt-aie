@@ -92,15 +92,22 @@ def ntt():
 
         # Output Array
         of_outs = []
-        of_outs_core = [[[] for r in range(n_row)] for c in range(n_column)]
+        of_outs_core = [[] for c in range(n_column)]
         of_outs_names = [f"out{c}" for c in range(n_column)]
-        of_outs_core_names = [[[f"out{c}_{r}first", f"out{c}_{r}second"] for r in range(n_row)] for c in range(n_column)]
+        of_outs_core_names = [[f"out{c}_{r}" for r in range(n_row)] for c in range(n_column)]
         for c in range(n_column):
             of_outs.append(object_fifo(of_outs_names[c], MemTiles[c], ShimTiles[c], buffer_depth, memRef_ty_column))
             for r in range(n_row):
-                for i in range(2):
-                    of_outs_core[c][r].append(object_fifo(of_outs_core_names[c][r][i], ComputeTiles[c][r], MemTiles[c], buffer_depth, memRef_ty_core_half))
-            object_fifo_link([item for sublist in of_outs_core[c] for item in sublist], of_outs[c])
+                of_outs_core[c].append(object_fifo(of_outs_core_names[c][r], ComputeTiles[c][r], MemTiles[c], buffer_depth, memRef_ty_core))
+            object_fifo_link(of_outs_core[c], of_outs[c])
+        
+        # Local Buff
+        of_buffs = [[] for c in range(n_column)]
+        of_buffs_names = [[f"buff{c}_{r}" for r in range(n_row)] for c in range(n_column)]
+        for c in range(n_column):
+            for r in range(n_row):
+                of_buffs[c].append(object_fifo(of_buffs_names[c][r], ComputeTiles[c][r], ComputeTiles[c][r], 2, memRef_ty_core_half))
+        
 
         # Link between ComputeTiles
         of_up = [[] for c in range(n_column)]
@@ -136,16 +143,16 @@ def ntt():
                         #    NTT Stage 0 to n-2
                         # ============================
                         # Acquire
-                        elem_out_local = of_outs_core[c][r][0].acquire(ObjectFifoPort.Produce, 1) if r % 2 == 0 else of_outs_core[c][r][1].acquire(ObjectFifoPort.Produce, 1) 
+                        elem_buff_local = of_buffs[c][r].acquire(ObjectFifoPort.Produce, 1) 
                         elem_out_next = of_up[c][r//2].acquire(ObjectFifoPort.Produce, 1) if r % 2 == 0 else of_down[c][r//2].acquire(ObjectFifoPort.Produce, 1) 
                         elem_in = of_ins_core[c][r].acquire(ObjectFifoPort.Consume, 1)
                         elem_root = of_inroots_core[c].acquire(ObjectFifoPort.Consume, 1)
                         
                         # Call NTT kernel
                         if r % 2 == 0:
-                            call(ntt_stage_0_to_N_2, [N, N_percore, log2_N_percore, core_idx, elem_in, elem_root, elem_out_local, elem_out_next, p, barrett_w, barrett_u])
+                            call(ntt_stage_0_to_N_2, [N, N_percore, log2_N_percore, core_idx, elem_in, elem_root, elem_buff_local, elem_out_next, p, barrett_w, barrett_u])
                         else:
-                            call(ntt_stage_0_to_N_2, [N, N_percore, log2_N_percore, core_idx, elem_in, elem_root, elem_out_next, elem_out_local, p, barrett_w, barrett_u])
+                            call(ntt_stage_0_to_N_2, [N, N_percore, log2_N_percore, core_idx, elem_in, elem_root, elem_out_next, elem_buff_local, p, barrett_w, barrett_u])
                         
                         # Release
                         of_ins_core[c][r].release(ObjectFifoPort.Consume, 1)
@@ -164,9 +171,9 @@ def ntt():
                         # Call NTT kernel
                         # void ntt_stage_N_1(int32_t N, int32_t *out0, int32_t *out1, int32_t *in_a0, int32_t *in_a1, int32_t *in_root, int32_t p, int32_t w, int32_t u) {
                         if r % 2 == 0:
-                            call(ntt_stage_N_1, [N_percore, elem_out_local, elem_out_next, elem_out_local, elem_in_next, elem_root, p, barrett_w, barrett_u])
+                            call(ntt_stage_N_1, [N_percore, elem_buff_local, elem_out_next, elem_buff_local, elem_in_next, elem_root, p, barrett_w, barrett_u])
                         else:
-                            call(ntt_stage_N_1, [N_percore, elem_out_next, elem_out_local, elem_in_next, elem_out_local, elem_root, p, barrett_w, barrett_u])
+                            call(ntt_stage_N_1, [N_percore, elem_out_next, elem_buff_local, elem_in_next, elem_buff_local, elem_root, p, barrett_w, barrett_u])
                         
                         # Release
                         of_inroots_core[c].release(ObjectFifoPort.Consume, 1)
@@ -178,16 +185,23 @@ def ntt():
                             of_down2[c][r//2].release(ObjectFifoPort.Produce, 1)
                         
                         # Write Back
-                        elem_result_from = of_down2[c][r//2].acquire(ObjectFifoPort.Consume, 1) if r % 2 == 0 else of_up2[c][r//2].acquire(ObjectFifoPort.Consume, 1) 
-                        elem_out_local = of_outs_core[c][r][1].acquire(ObjectFifoPort.Produce, 1) if r % 2 == 0 else of_outs_core[c][r][0].acquire(ObjectFifoPort.Produce, 1) 
-                        for i in for_(N//2):
-                            v0 = memref.load(elem_result_from, [i])
-                            memref.store(v0, elem_out_local, [i])
+                        elem_out_local = of_outs_core[c][r].acquire(ObjectFifoPort.Produce, 1)
+                        elem_result_fromnext = of_down2[c][r//2].acquire(ObjectFifoPort.Consume, 1) if r % 2 == 0 else of_up2[c][r//2].acquire(ObjectFifoPort.Consume, 1)  
+                        for i in for_(N_percore//2):
+                            v0 = memref.load(elem_buff_local, [i])
+                            #v0 = arith.constant(11, T.i32())
+                            v1 = memref.load(elem_result_fromnext, [i])
+                            if r % 2 == 0:
+                                memref.store(v0, elem_out_local, [i])
+                                memref.store(v1, elem_out_local, [i + N_percore//2])
+                            else:
+                                memref.store(v1, elem_out_local, [i])
+                                memref.store(v0, elem_out_local, [i + N_percore//2])
                             yield_([])
                         
                         # Release
-                        of_outs_core[c][r][0].release(ObjectFifoPort.Produce, 1)
-                        of_outs_core[c][r][1].release(ObjectFifoPort.Produce, 1)
+                        of_buffs[c][r].release(ObjectFifoPort.Produce, 1) 
+                        of_outs_core[c][r].release(ObjectFifoPort.Produce, 1)
                         if r % 2 == 0:
                             of_down2[c][r//2].release(ObjectFifoPort.Consume, 1)
                         else:
