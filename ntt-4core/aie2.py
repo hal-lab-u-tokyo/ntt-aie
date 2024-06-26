@@ -172,14 +172,14 @@ def ntt():
                         # r == 3: of_down2[c][2], *local
                         sw_elem_out0 = {
                             0: of_buffs[c][0],
-                            1: of_down2[c][0],
+                            1: of_down2[c][0], # *
                             2: of_down2[c][1],
                             3: of_down2[c][2]
                         }
                         sw_elem_out1 = {
                             0: of_up2[c][0],
                             1: of_up2[c][1],
-                            2: of_up2[c][2],
+                            2: of_up2[c][2], # *
                             3: of_buffs[c][3]
                         }
                         elem_out0 = sw_elem_out0.get(r).acquire(ObjectFifoPort.Produce, 1)
@@ -196,8 +196,10 @@ def ntt():
                         
                         # Release
                         of_inroots_core[c].release(ObjectFifoPort.Consume, 1)
-                        sw_elem_out0.get(r).release(ObjectFifoPort.Produce, 1)
-                        sw_elem_out1.get(r).release(ObjectFifoPort.Produce, 1)
+                        if r != 1:
+                            sw_elem_out0.get(r).release(ObjectFifoPort.Produce, 1) 
+                        if r != 2:
+                            sw_elem_out1.get(r).release(ObjectFifoPort.Produce, 1)
                         if r % 2 == 0:
                             of_down[c][r].release(ObjectFifoPort.Consume, 1)
                         else:
@@ -265,12 +267,12 @@ def ntt():
                             0: of_buffs[c][0],
                             1: of_down2[c][0],
                             2: of_up2[c][1],
-                            3: of_up[c][2] #
+                            3: of_up[c][2]
                         }
                         sw_elem_in1 = {
                             0: of_down[c][0],
                             1: of_down2[c][1],
-                            2: of_up2[c][2], #
+                            2: of_up2[c][2],
                             3: of_buffs[c][r]
                         }
                         elem_in0 = sw_elem_in0.get(r).acquire(ObjectFifoPort.Consume, 1) if r != 1 else sw_elem_in0.get(r).acquire(ObjectFifoPort.Produce, 1) 

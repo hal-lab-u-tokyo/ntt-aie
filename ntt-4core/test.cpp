@@ -183,7 +183,7 @@ int main(int argc, const char *argv[]) {
       std::cout << "[" << i << "] Error: (get vs expected) = " << test << " != " << ref << std::endl;
       errors++;
     } else {
-      std::cout << "[" << i << "] Correct " << test << " == " << ref << std::endl;
+      //std::cout << "[" << i << "] Correct " << test << " == " << ref << std::endl;
     }
   }
 
