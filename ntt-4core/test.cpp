@@ -135,7 +135,7 @@ int main(int argc, const char *argv[]) {
   std::vector<int32_t> answers_input;
   std::vector<int32_t> answers(IN_VOLUME);
   bool is_answer_file = 1;
-  std::string filename = std::format("../../data/ans_q{}_n{}_stage{}.txt", p, n, n-2);
+  std::string filename = std::format("../../data/ans_q{}_n{}_stage{}.txt", p, n, n-1);
   
   if (is_answer_file){
     std::ifstream ansFile(filename);
@@ -150,7 +150,7 @@ int main(int argc, const char *argv[]) {
     for (int i = 0; i < IN_VOLUME; i++){
       std::cout << "answers_input[" << i << "] = " << answers_input[i] << std::endl;
     }
-    std::array<int, 8> base = {0, 2, 4, 6, 1, 3, 5, 7};
+    std::array<int, 8> base = {0, 1, 4, 5, 2, 3, 6, 7};
     int block_size = IN_VOLUME/8;
     for (int i = 0; i < 8; i++){
       int base_i = base[i] * block_size;
