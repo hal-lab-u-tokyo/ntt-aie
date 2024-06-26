@@ -228,13 +228,13 @@ def ntt():
                             of_up2[c][1].release(ObjectFifoPort.Produce, 1)
                         elif r == 2:
                             elem_in = of_up2[c][1].acquire(ObjectFifoPort.Consume, 1)
-                            elem_out = of_up2[c][2].acquire(ObjectFifoPort.Produce, 1)
+                            elem_out = of_up[c][2].acquire(ObjectFifoPort.Produce, 1)
                             for i in for_(N_percore//2):
                                 v0 = memref.load(elem_in, [i])
                                 memref.store(v0, elem_out, [i]) 
                                 yield_([])
                             of_up2[c][1].release(ObjectFifoPort.Consume, 1)
-                            of_up2[c][2].release(ObjectFifoPort.Produce, 1)
+                            of_up[c][2].release(ObjectFifoPort.Produce, 1)
 
                             elem_in = of_down2[c][2].acquire(ObjectFifoPort.Consume, 1)
                             elem_out = of_down2[c][1].acquire(ObjectFifoPort.Produce, 1)
@@ -265,16 +265,34 @@ def ntt():
                             0: of_buffs[c][0],
                             1: of_down2[c][0],
                             2: of_up2[c][1],
-                            3: of_up[c][2]
+                            3: of_up[c][2] #
                         }
                         sw_elem_in1 = {
                             0: of_down[c][0],
                             1: of_down2[c][1],
-                            2: of_up2[c][2],
+                            2: of_up2[c][2], #
                             3: of_buffs[c][r]
                         }
                         elem_in0 = sw_elem_in0.get(r).acquire(ObjectFifoPort.Consume, 1) if r != 1 else sw_elem_in0.get(r).acquire(ObjectFifoPort.Produce, 1) 
                         elem_in1 = sw_elem_in1.get(r).acquire(ObjectFifoPort.Consume, 1) if r != 2 else sw_elem_in1.get(r).acquire(ObjectFifoPort.Produce, 1) 
+                        
+                        
+                        # Write Back
+                        elem_out_local = of_outs_core[c][r].acquire(ObjectFifoPort.Produce, 1)
+                        for i in for_(N_percore//2):
+                            #v0 = arith.constant(11, T.i32())
+                            v0 = memref.load(elem_in0, [i])
+                            v1 = memref.load(elem_in1, [i])
+                            memref.store(v0, elem_out_local, [i])
+                            memref.store(v1, elem_out_local, [i + N_percore // 2])
+                            yield_([])
+                        
+                        
+                        sw_elem_in0.get(r).release(ObjectFifoPort.Consume, 1) if r != 1 else sw_elem_in0.get(r).release(ObjectFifoPort.Produce, 1) 
+                        sw_elem_in1.get(r).release(ObjectFifoPort.Consume, 1) if r != 2 else sw_elem_in1.get(r).release(ObjectFifoPort.Produce, 1) 
+                        of_outs_core[c][r].release(ObjectFifoPort.Produce, 1)
+
+                        """
 
                         # Write Back
                         elem_out_local = of_outs_core[c][r].acquire(ObjectFifoPort.Produce, 1)
@@ -290,6 +308,7 @@ def ntt():
                         of_outs_core[c][r].release(ObjectFifoPort.Produce, 1)
                         sw_elem_in0.get(r).release(ObjectFifoPort.Consume, 1) if r != 1 else sw_elem_in0.get(r).release(ObjectFifoPort.Produce, 1) 
                         sw_elem_in1.get(r).release(ObjectFifoPort.Consume, 1) if r != 2 else sw_elem_in1.get(r).release(ObjectFifoPort.Produce, 1) 
+                        """
                         yield_([])
                     
         # To/from AIE-array data movement
