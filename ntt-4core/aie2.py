@@ -55,6 +55,11 @@ def ntt():
             "ntt_stage_N_2",
             inputs=[T.i32(), T.i32(), T.i32(), memRef_ty_core_half, memRef_ty_core_half, memRef_ty_core_half, memRef_ty_core_half, memRef_ty_vec, T.i32(), T.i32(), T.i32()],
         )
+        # void ntt_stage_N_1(int32_t N, int32_t core_idx, int32_t *out0, int32_t *out1, int32_t *in0, int32_t *in1, int32_t *in_root, int32_t p, int32_t w, int32_t u) {
+        ntt_stage_N_1 = external_func(
+            "ntt_stage_N_1",
+            inputs=[T.i32(), T.i32(), T.i32(), memRef_ty_core_half, memRef_ty_core_half, memRef_ty_core_half, memRef_ty_core_half, memRef_ty_vec, T.i32(), T.i32(), T.i32()],
+        )
 
         # Tile declarations
         ShimTiles = []
@@ -185,7 +190,6 @@ def ntt():
                         elem_out0 = sw_elem_out0.get(r).acquire(ObjectFifoPort.Produce, 1)
                         elem_out1 = sw_elem_out1.get(r).acquire(ObjectFifoPort.Produce, 1)
                         elem_in_next = of_down[c][r].acquire(ObjectFifoPort.Consume, 1) if r % 2 == 0 else of_up[c][r-1].acquire(ObjectFifoPort.Consume, 1) 
-                        #elem_out_next = of_up2[c][r].acquire(ObjectFifoPort.Produce, 1) if r % 2 == 0 else of_down2[c][r-1].acquire(ObjectFifoPort.Produce, 1) 
                         
                         # Call NTT kernel
                         # void ntt_stage_N_2(int32_t N, int32_t core_idx, int32_t n_core, int32_t *out0, int32_t *out1, int32_t *in0, int32_t *in1, int32_t *in_root, int32_t p, int32_t w, int32_t u) {
@@ -196,13 +200,19 @@ def ntt():
                         
                         # Release
                         of_inroots_core[c].release(ObjectFifoPort.Consume, 1)
-                        if r != 1:
+                        if r == 0:
                             sw_elem_out0.get(r).release(ObjectFifoPort.Produce, 1) 
-                        if r != 2:
                             sw_elem_out1.get(r).release(ObjectFifoPort.Produce, 1)
-                        if r % 2 == 0:
                             of_down[c][r].release(ObjectFifoPort.Consume, 1)
-                        else:
+                        elif r == 1:
+                            sw_elem_out1.get(r).release(ObjectFifoPort.Produce, 1)
+                            of_up[c][r-1].release(ObjectFifoPort.Consume, 1)
+                        elif r == 2:
+                            sw_elem_out0.get(r).release(ObjectFifoPort.Produce, 1) 
+                            of_down[c][r].release(ObjectFifoPort.Consume, 1)
+                        elif r == 3:
+                            sw_elem_out0.get(r).release(ObjectFifoPort.Produce, 1) 
+                            sw_elem_out1.get(r).release(ObjectFifoPort.Produce, 1)
                             of_up[c][r-1].release(ObjectFifoPort.Consume, 1)
 
                         # Transfer
