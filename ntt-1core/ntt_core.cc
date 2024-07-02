@@ -130,7 +130,6 @@ void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *root_in, int32_t *c_out, int3
   aie::vector<int32_t, vec_prime_half> u_vector_half = aie::broadcast<int32_t, vec_prime_half>(u);
   aie::vector<int32_t, vec_prime> zero_vector = aie::zeros<int32_t, vec_prime>();
   aie::vector<int32_t, vec_prime_half> zero_vector_half = aie::zeros<int32_t, vec_prime_half>();
-
   // Stage 0
   event0();
   for (int i = 0; i < N / vec_prime; i++){
@@ -154,10 +153,6 @@ void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *root_in, int32_t *c_out, int3
   }
   event1();
 
-  for (int i = 0; i < N; i++){
-    c_out[i] = a_in[i];
-  }
-
   // Stage 1
   event0();
   bf_width *= 2;
@@ -180,11 +175,14 @@ void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *root_in, int32_t *c_out, int3
     v0_r = vector_barrett(v0_r, p_vector, root_vector, u_vector, w);
     auto [v0_r0, v0_r1] = aie::interleave_unzip(v0_r, zero_vector, 2);
 
-    auto [res, res2] = aie::interleave_zip(v0_r1, v0_l0, 2);
+    auto [res, res2] = aie::interleave_zip(v0_l0, v0_r1, 2);
     aie::store_v(pA_i, res);
   }
   event1();
-/*
+  
+  for (int i = 0; i < N; i++){
+    c_out[i] = a_in[i];
+  }
 
   // Stage 2
   event0();
@@ -223,7 +221,6 @@ void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *root_in, int32_t *c_out, int3
     }
   }
   event1();
-*/
 }
 
 } // extern "C"
