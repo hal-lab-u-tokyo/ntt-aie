@@ -119,15 +119,33 @@ int main(int argc, const char *argv[]) {
 
   // Execute the kernel and wait to finish
   std::cout << "Running Kernel.\n";
+  for (int i = 0; i < 10; i++){
+    auto start = std::chrono::high_resolution_clock::now();
+    auto run = kernel(bo_instr, instr_v.size(), bo_inA, bo_root, bo_outC);
+    ert_cmd_state r = run.wait();
+    auto stop = std::chrono::high_resolution_clock::now();
+    if (r != ERT_CMD_STATE_COMPLETED) {
+      std::cout << "kernel did not complete. returned status: " << r << "\n";
+      return 1;
+    }
+    // Sync device to host memories
+    bo_outC.sync(XCL_BO_SYNC_BO_FROM_DEVICE);
+    
+    // Time
+    float npu_time = std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count();
+    std::cout << "  Avg NPU NTT time: " << npu_time << "us." << std::endl;
+  }
+
+  
   auto start = std::chrono::high_resolution_clock::now();
   auto run = kernel(bo_instr, instr_v.size(), bo_inA, bo_root, bo_outC);
   ert_cmd_state r = run.wait();
   auto stop = std::chrono::high_resolution_clock::now();
   if (r != ERT_CMD_STATE_COMPLETED) {
-      std::cout << "kernel did not complete. returned status: " << r << "\n";
-      return 1;
+    std::cout << "kernel did not complete. returned status: " << r << "\n";
+    return 1;
   }
-
+  
   // Sync device to host memories
   bo_outC.sync(XCL_BO_SYNC_BO_FROM_DEVICE);
 
@@ -154,7 +172,7 @@ int main(int argc, const char *argv[]) {
       std::cout << "[" << i << "] Error " << test << " != " << ref << std::endl;
       errors++;
     } else {
-      std::cout << "[" << i << "] Correct " << test << " == " << ref << std::endl;
+      //std::cout << "[" << i << "] Correct " << test << " == " << ref << std::endl;
     }
   }
 
@@ -166,8 +184,6 @@ int main(int argc, const char *argv[]) {
   std::cout << "=================================: " << std::endl;
   std::cout << "  logN: " << n << std::endl;
   std::cout << "  p: " << p << std::endl;
-  float npu_time = std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count();
-  std::cout << "  Avg NPU NTT time: " << npu_time << "us." << std::endl;
 
   // Print Pass/Fail result of our test
   if (!errors) {

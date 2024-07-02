@@ -143,19 +143,20 @@ void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *root_in, int32_t *c_out, int3
   for (int stage = 3; stage < logN; stage++){
     bf_width *= 2;
     root_idx /= 2;
-    for (int i = 0; i < F; i++){
+    for (int i = 0; i < F; i++)
+      chess_prepare_for_pipelining chess_loop_range(64, ) {
       int32_t cycle = bf_width / vec_prime;
       int32_t idx_base = (i / cycle) * bf_width * 2 + (i % cycle) * vec_prime;
-      int32_t *__restrict pA1_i = a_in + idx_base;
+      int32_t *__restrict pA_i = a_in + idx_base;
       int32_t root = root_in[root_idx + i / cycle];
-      aie::vector<int32_t, vec_prime> v0 = aie::load_v<vec_prime>(pA1_i);
-      aie::vector<int32_t, vec_prime> v1 = aie::load_v<vec_prime>(pA1_i + bf_width);
+      aie::vector<int32_t, vec_prime> v0 = aie::load_v<vec_prime>(pA_i);
+      aie::vector<int32_t, vec_prime> v1 = aie::load_v<vec_prime>(pA_i + bf_width);
       aie::vector<int32_t, vec_prime> root_vector = aie::broadcast<int32_t, vec_prime>(root);
       if (stage == logN - 1){
         int32_t *__restrict pC_i = c_out + idx_base;
         ntt_stage_parallel8(v0, v1, p_vector, root_vector, u_vector, pC_i, bf_width, p, w);     
       }else {
-        ntt_stage_parallel8(v0, v1, p_vector, root_vector, u_vector, pA1_i, bf_width, p, w);     
+        ntt_stage_parallel8(v0, v1, p_vector, root_vector, u_vector, pA_i, bf_width, p, w);     
       }
     }
   }
