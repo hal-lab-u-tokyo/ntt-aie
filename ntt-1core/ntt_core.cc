@@ -128,9 +128,9 @@ void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *root_in, int32_t *c_out, int3
   aie::vector<int32_t, vec_prime> u_vector = aie::broadcast<int32_t, vec_prime>(u);
   aie::vector<int32_t, vec_prime_half> p_vector_half = aie::broadcast<int32_t, vec_prime_half>(p);
   aie::vector<int32_t, vec_prime_half> u_vector_half = aie::broadcast<int32_t, vec_prime_half>(u);
+  aie::vector<int32_t, vec_prime> zero_vector = aie::zeros<int32_t, vec_prime>();
   aie::vector<int32_t, vec_prime_half> zero_vector_half = aie::zeros<int32_t, vec_prime_half>();
 
-  
   // Stage 0
   event0();
   for (int i = 0; i < N / vec_prime; i++){
@@ -163,6 +163,7 @@ void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *root_in, int32_t *c_out, int3
     aie::vector<int32_t, vec_prime> v0 = aie::load_v<vec_prime>(pA_i);
     aie::vector<int32_t, vec_prime> v0_l = aie::shuffle_down(v0, 2);
     v0_l = vector_modadd(v0, v0_l, p_vector);
+    auto [v0_l0, v0_l1] = aie::interleave_unzip(v0_l, zero_vector, 2);
     
     aie::vector<int32_t, vec_prime> v0_r = aie::shuffle_up(v0, 2);
     v0_r = vector_modsub(v0_r, v0, p_vector);
@@ -173,8 +174,9 @@ void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *root_in, int32_t *c_out, int3
     root1_vector_half = aie::shuffle_up_fill(root1_vector_half, zero_vector_half, 2);
     aie::vector<int32_t, vec_prime> root_vector = aie::concat(root0_vector_half, root1_vector_half);
     v0_r = vector_barrett(v0_r, p_vector, root_vector, u_vector, w);
+    auto [v0_r0, v0_r1] = aie::interleave_unzip(v0_r, zero_vector, 2);
 
-    auto [res, res2] = aie::interleave_unzip(v0_l, v0_r, 2);
+    auto [res, res2] = aie::interleave_zip(v0_r1, v0_l0, 2);
     aie::store_v(pA_i, res);
   }
   event1();
