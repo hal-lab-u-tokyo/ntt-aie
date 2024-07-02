@@ -44,7 +44,7 @@ void make_roots(int32_t n, std::vector<int32_t> &roots, int64_t p, int64_t g){
 int main(int argc, const char *argv[]) {
   constexpr int64_t p = 3329;
   constexpr int64_t g = 3;
-  constexpr int64_t n = 10;
+  constexpr int64_t n = 7;
   constexpr int64_t trace_size = 1 << 15;
   int IN_VOLUME = 1 << n;
   int OUT_VOLUME = IN_VOLUME + trace_size;
@@ -128,7 +128,7 @@ int main(int argc, const char *argv[]) {
     
     // Time
     float npu_time = std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count();
-    std::cout << "  " << npu_time << std::endl;
+    std::cout << npu_time << std::endl;
   }
 
   
@@ -159,7 +159,7 @@ int main(int argc, const char *argv[]) {
   
   std::cout << "=================================: " << std::endl;
   int errors = 0;
-  std::cout << "Verifying results ..." << std::endl;
+  std::cout << "Verifying results with " << filename << std::endl;
   
   for (int32_t i = 0; i < IN_VOLUME; i++) {
     int32_t ref = answers[i];

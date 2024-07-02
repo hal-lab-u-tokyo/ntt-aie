@@ -160,7 +160,7 @@ void export_vector_to_file(std::vector<int64_t> &poly, int32_t q, int32_t n, int
 int main() {
     std::cout << "DFT" << std::endl;
     // Parameters
-    int32_t logn = 10;
+    int32_t logn = 7;
     int64_t n = 1 << logn;
     //int64_t p = 998244353;
     //int64_t p = 65537;
@@ -173,7 +173,7 @@ int main() {
     int32_t barrett_u = std::floor(std::pow(2, 2 * barrett_w) / p);
     //std::cout << "(w, n_inv) = (" << w << ", " << n_inv << ")" << std::endl;
 
-    int stage = 2;
+    int stage = logn - 1;
 
     std::vector<int64_t> roots(n);
     std::vector<int64_t> invroots(n);

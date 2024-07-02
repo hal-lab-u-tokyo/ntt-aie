@@ -131,6 +131,7 @@ void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *root_in, int32_t *c_out, int3
   aie::vector<int32_t, vec_prime> zero_vector = aie::zeros<int32_t, vec_prime>();
   aie::vector<int32_t, vec_prime_half> zero_vector_half = aie::zeros<int32_t, vec_prime_half>();
   aie::vector<int32_t, 4> zero_vector4 = aie::zeros<int32_t, 4>();
+
   // Stage 0
   event0();
   for (int i = 0; i < N / vec_prime; i++){
@@ -241,6 +242,7 @@ void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *root_in, int32_t *c_out, int3
 
   // Stage 4 to Stage N-1
   for (int stage = 4; stage < logN; stage++){
+    event0();
     bf_width *= 2;
     root_idx /= 2;
     for (int i = 0; i < F; i++)
@@ -259,8 +261,8 @@ void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *root_in, int32_t *c_out, int3
         ntt_stage_parallel8(v0, v1, p_vector, root_vector, u_vector, pA_i, bf_width, p, w);     
       }
     }
+    event1();
   }
-  event1();
 }
 
 } // extern "C"

@@ -19,14 +19,19 @@ for i in range(3):
             print(f"{fname} is empty, skip")
             continue
         
-        # Average of values
-        avg_value = df.mean().values[0]
+        # Average of values filtering max and min
+        column_data = df.iloc[:, 0]
+        filtered_data = column_data[(column_data != column_data.max()) & (column_data != column_data.min())]
+        avg_value = filtered_data.mean()
 
         # Cal Utilization
         flops_actually = 8 * n * j / (avg_value * 0.0001)
-        flops_peak = 400000000
+        flops_peak = (2 ** i) * 20000000 # N * 20GHz
         utilization = flops_actually / flops_peak
-        print(f"avg:{avg_value}, actualy:{flops_actually}, peak:{flops_peak}, utilization:{utilization}")
+        print(f"avg:{avg_value}")
+        print(f"actualy:{flops_actually}")
+        print(f"peak:{flops_peak}")
+        print(f"utilization:{utilization}")
 
         # Save data
         if i not in data:
