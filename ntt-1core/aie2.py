@@ -91,7 +91,7 @@ def my_vector_scalar():
             #npu_dma_memcpy_nd(metadata="inprime", bd_id=3, mem=F, sizes=[1, 1, 1, 1])
             npu_sync(column=0, row=0, direction=0, channel=0)
 
-trace_size = 0 if (len(sys.argv) != 2) else int(sys.argv[1])
+trace_size = 2 ** 15
 with mlir_mod_ctx() as ctx:
     my_vector_scalar()
     print(ctx.module)

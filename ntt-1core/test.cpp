@@ -45,7 +45,7 @@ int main(int argc, const char *argv[]) {
   constexpr int64_t p = 3329;
   constexpr int64_t g = 3;
   constexpr int64_t n = 10;
-  constexpr int64_t trace_size = 8192;
+  constexpr int64_t trace_size = 1 << 15;
   int IN_VOLUME = 1 << n;
   int OUT_VOLUME = IN_VOLUME + trace_size;
   constexpr bool VERIFY = true;
@@ -163,20 +163,19 @@ int main(int argc, const char *argv[]) {
                                 vm["trace_file"].as<std::string>());
   }
 
+  std::cout << "=================================: " << std::endl;
+  std::cout << "  logN: " << n << std::endl;
+  std::cout << "  p: " << p << std::endl;
   float npu_time = std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count();
-  std::cout << std::endl
-            << "Avg NPU NTT time: " << npu_time << "us."
-            << std::endl;
+  std::cout << "  Avg NPU NTT time: " << npu_time << "us." << std::endl;
 
   // Print Pass/Fail result of our test
   if (!errors) {
-    std::cout << std::endl << "PASS!" << std::endl << std::endl;
+    std::cout << std::endl << " PASS!" << std::endl;
     return 0;
   } else {
-    std::cout << std::endl
-              << errors << " mismatches." << std::endl
-              << std::endl;
-    std::cout << std::endl << "fail." << std::endl << std::endl;
+    std::cout << "  mismatches: " << errors << std::endl;
+    std::cout << "  FAIL." << std::endl << std::endl;
     return 1;
   }
 }
