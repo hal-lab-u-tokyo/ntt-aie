@@ -44,8 +44,8 @@ void make_roots(int32_t n, std::vector<int32_t> &roots, int64_t p, int64_t g){
 int main(int argc, const char *argv[]) {
   constexpr int64_t p = 3329;
   constexpr int64_t g = 3;
-  constexpr int64_t n = 10;
-  constexpr int64_t trace_size = 1 << 15;
+  constexpr int64_t n = 11;
+  constexpr int64_t trace_size = 8192;
   int IN_VOLUME = 1 << n;
   int OUT_VOLUME = IN_VOLUME + trace_size;
   constexpr bool VERIFY = true;
@@ -92,11 +92,6 @@ int main(int argc, const char *argv[]) {
   std::vector<int32_t> root(IN_VOLUME);
   root[0] = 1;
   make_roots(IN_VOLUME, root, p, g);
-  std::cout << "roots: ";
-  for (int i = IN_VOLUME / 2; i < IN_VOLUME; i++){
-      std::cout << root[i] << " ";
-  }
-  std::cout << std::endl;
   
   // Initialize buffer
   int32_t *bufInA = bo_inA.map<int32_t *>();
@@ -132,16 +127,43 @@ int main(int argc, const char *argv[]) {
   bo_outC.sync(XCL_BO_SYNC_BO_FROM_DEVICE);
 
   // Compare out to golden
-  std::string filename = std::format("../../data/ans_q{}_n{}.txt", p, n);
-  std::ifstream ansFile(filename);
-  if (!ansFile) {
-      std::cerr << "Error opening file: " << filename << std::endl;
-      return 1;
-  }
-  std::vector<int32_t> answers;
-  int ans;
-  while (ansFile >> ans) {
-      answers.push_back(ans);
+  std::vector<int32_t> answers_input;
+  std::vector<int32_t> answers(IN_VOLUME);
+  bool is_answer_file = 1;
+  std::string filename = std::format("../../data/ans_q{}_n{}_stage{}.txt", p, n, n-2);
+  
+  if (is_answer_file){
+    std::ifstream ansFile(filename);
+    if (!ansFile) {
+        std::cerr << "Error opening file: " << filename << std::endl;
+        return 1;
+    }
+    int ans;
+    while (ansFile >> ans) {
+        answers_input.push_back(ans);
+    }
+    const int block_num = 8;
+    std::array<int, block_num> base = {0, 2, 1, 3, 4, 6, 5, 7};
+    int block_size = IN_VOLUME / block_num;
+    for (int i = 0; i < block_num; i++){
+      int base_i = base[i] * block_size;
+      for (int j = 0; j < block_size; j++){
+        answers[base_i + j] = answers_input[i * block_size + j];
+      }
+    }
+  }else {
+    int n_column = 1;
+    int n_row = 2;
+    int n_percore = IN_VOLUME / (n_row * n_column);
+    for (int i = 0; i < n_column; i++){
+      for (int j = 0; j < n_row; j++){
+        int core_idx = i * n_column + j;
+        for (int k = 0; k < n_percore; k++){
+          int idx = core_idx * n_percore + k;
+          answers.push_back(idx); 
+        }
+      }
+    }
   }
   
   int errors = 0;
@@ -151,10 +173,10 @@ int main(int argc, const char *argv[]) {
     int32_t ref = answers[i];
     int32_t test = bufOut[i];
     if (test != ref) {
-      std::cout << "[" << i << "] Error " << test << " != " << ref << std::endl;
+      std::cout << "[" << i << "] Error: (get vs expected) = " << test << " != " << ref << std::endl;
       errors++;
     } else {
-      std::cout << "[" << i << "] Correct " << test << " == " << ref << std::endl;
+      //std::cout << "[" << i << "] Correct " << test << " == " << ref << std::endl;
     }
   }
 
@@ -163,19 +185,23 @@ int main(int argc, const char *argv[]) {
                                 vm["trace_file"].as<std::string>());
   }
 
-  std::cout << "=================================: " << std::endl;
-  std::cout << "  logN: " << n << std::endl;
-  std::cout << "  p: " << p << std::endl;
   float npu_time = std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count();
-  std::cout << "  Avg NPU NTT time: " << npu_time << "us." << std::endl;
+  std::cout << std::endl
+            << "Avg NPU NTT time: " << npu_time << "us."
+            << std::endl;
+  if (is_answer_file){
+    std::cout << "Verified with answer file: " << filename << std::endl;
+  }
 
   // Print Pass/Fail result of our test
   if (!errors) {
-    std::cout << std::endl << " PASS!" << std::endl;
+    std::cout << std::endl << "PASS!" << std::endl << std::endl;
     return 0;
   } else {
-    std::cout << "  mismatches: " << errors << std::endl;
-    std::cout << "  FAIL." << std::endl << std::endl;
+    std::cout << std::endl
+              << errors << " mismatches." << std::endl
+              << std::endl;
+    std::cout << std::endl << "fail." << std::endl << std::endl;
     return 1;
   }
 }
