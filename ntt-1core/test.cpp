@@ -44,7 +44,7 @@ void make_roots(int32_t n, std::vector<int32_t> &roots, int64_t p, int64_t g){
 int main(int argc, const char *argv[]) {
   constexpr int64_t p = 3329;
   constexpr int64_t g = 3;
-  constexpr int64_t n = 10;
+  constexpr int64_t n = 7;
   constexpr int64_t trace_size = 1 << 15;
   int IN_VOLUME = 1 << n;
   int OUT_VOLUME = IN_VOLUME + trace_size;
@@ -92,11 +92,6 @@ int main(int argc, const char *argv[]) {
   std::vector<int32_t> root(IN_VOLUME);
   root[0] = 1;
   make_roots(IN_VOLUME, root, p, g);
-  std::cout << "roots: ";
-  for (int i = IN_VOLUME / 2; i < IN_VOLUME; i++){
-      std::cout << root[i] << " ";
-  }
-  std::cout << std::endl;
   
   // Initialize buffer
   int32_t *bufInA = bo_inA.map<int32_t *>();
@@ -119,20 +114,38 @@ int main(int argc, const char *argv[]) {
 
   // Execute the kernel and wait to finish
   std::cout << "Running Kernel.\n";
+  for (int i = 0; i < 10; i++){
+    auto start = std::chrono::high_resolution_clock::now();
+    auto run = kernel(bo_instr, instr_v.size(), bo_inA, bo_root, bo_outC);
+    ert_cmd_state r = run.wait();
+    auto stop = std::chrono::high_resolution_clock::now();
+    if (r != ERT_CMD_STATE_COMPLETED) {
+      std::cout << "kernel did not complete. returned status: " << r << "\n";
+      return 1;
+    }
+    // Sync device to host memories
+    bo_outC.sync(XCL_BO_SYNC_BO_FROM_DEVICE);
+    
+    // Time
+    float npu_time = std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count();
+    std::cout << npu_time << std::endl;
+  }
+
+  
   auto start = std::chrono::high_resolution_clock::now();
   auto run = kernel(bo_instr, instr_v.size(), bo_inA, bo_root, bo_outC);
   ert_cmd_state r = run.wait();
   auto stop = std::chrono::high_resolution_clock::now();
   if (r != ERT_CMD_STATE_COMPLETED) {
-      std::cout << "kernel did not complete. returned status: " << r << "\n";
-      return 1;
+    std::cout << "kernel did not complete. returned status: " << r << "\n";
+    return 1;
   }
-
+  
   // Sync device to host memories
   bo_outC.sync(XCL_BO_SYNC_BO_FROM_DEVICE);
 
   // Compare out to golden
-  std::string filename = std::format("../../data/ans_q{}_n{}.txt", p, n);
+  std::string filename = std::format("../../data/ans_q{}_n{}_stage{}.txt", p, n, n-1);
   std::ifstream ansFile(filename);
   if (!ansFile) {
       std::cerr << "Error opening file: " << filename << std::endl;
@@ -144,8 +157,9 @@ int main(int argc, const char *argv[]) {
       answers.push_back(ans);
   }
   
+  std::cout << "=================================: " << std::endl;
   int errors = 0;
-  std::cout << "Verifying results ..." << std::endl;
+  std::cout << "Verifying results with " << filename << std::endl;
   
   for (int32_t i = 0; i < IN_VOLUME; i++) {
     int32_t ref = answers[i];
@@ -154,7 +168,7 @@ int main(int argc, const char *argv[]) {
       std::cout << "[" << i << "] Error " << test << " != " << ref << std::endl;
       errors++;
     } else {
-      std::cout << "[" << i << "] Correct " << test << " == " << ref << std::endl;
+      //std::cout << "[" << i << "] Correct " << test << " == " << ref << std::endl;
     }
   }
 
@@ -163,15 +177,12 @@ int main(int argc, const char *argv[]) {
                                 vm["trace_file"].as<std::string>());
   }
 
-  std::cout << "=================================: " << std::endl;
   std::cout << "  logN: " << n << std::endl;
   std::cout << "  p: " << p << std::endl;
-  float npu_time = std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count();
-  std::cout << "  Avg NPU NTT time: " << npu_time << "us." << std::endl;
 
   // Print Pass/Fail result of our test
   if (!errors) {
-    std::cout << std::endl << " PASS!" << std::endl;
+    std::cout << "  PASS!" << std::endl;
     return 0;
   } else {
     std::cout << "  mismatches: " << errors << std::endl;

@@ -19,7 +19,7 @@ import aie.utils.trace as trace_utils
 
 
 def my_vector_scalar():
-    logN = 10
+    logN = 7
     N = 1 << logN
     N_in_bytes = N * 4
     p = 3329

@@ -2,7 +2,9 @@
 #include <cassert>
 #include <cmath>
 #include <complex>
+#include <fstream> 
 #include <iostream>
+#include <string>
 #include <vector>
 
 void bit_reversal(int64_t n, std::vector<int64_t> &res) {
@@ -64,7 +66,7 @@ int32_t barrett_2k(int32_t a, int32_t b, int32_t q, int32_t w, int32_t u){
 }
 
 void ntt(std::vector<int64_t> &a, int64_t n,
-          std::vector<int64_t> &roots_rev, int64_t p, int32_t w, int32_t u) {
+          std::vector<int64_t> &roots_rev, int64_t p, int32_t w, int32_t u, int32_t stage) {
     int64_t t = 1;
     int64_t j1, j2, h;
     int idx = 0;
@@ -85,6 +87,9 @@ void ntt(std::vector<int64_t> &a, int64_t n,
             j1 += 2 * t;
         }
         t <<= 1;
+        if (idx == stage){
+            return;
+        }
         idx += 1;
     }
 }
@@ -136,10 +141,27 @@ void is_equal_polynomial(std::vector<int64_t> &a, std::vector<int64_t> &b) {
     std::cout << "...success!" << std::endl;
 }
 
+void export_vector_to_file(std::vector<int64_t> &poly, int32_t q, int32_t n, int32_t stage){
+    std::ostringstream oss;
+    oss << "../data/ans_q" << q << "_n" << n << "_stage" << stage << ".txt";
+    std::string filename = oss.str();
+    std::ofstream logFile(filename);
+    if (!logFile) {
+        std::cerr << "Failed to open file " << filename << std::endl;
+        return;
+    }
+    for (int64_t e : poly) {
+        logFile << e << std::endl;
+    }
+    logFile.close();
+    std::cout << "Write to " << filename << std::endl;
+}
+
 int main() {
     std::cout << "DFT" << std::endl;
     // Parameters
-    int64_t n = 1 << 10;
+    int32_t logn = 7;
+    int64_t n = 1 << logn;
     //int64_t p = 998244353;
     //int64_t p = 65537;
     int64_t p = 3329;
@@ -150,6 +172,8 @@ int main() {
     int32_t barrett_w = std::ceil(std::log2(p));
     int32_t barrett_u = std::floor(std::pow(2, 2 * barrett_w) / p);
     //std::cout << "(w, n_inv) = (" << w << ", " << n_inv << ")" << std::endl;
+
+    int stage = logn - 1;
 
     std::vector<int64_t> roots(n);
     std::vector<int64_t> invroots(n);
@@ -186,12 +210,12 @@ int main() {
 */
 
     std::cout << "========= ntt ===========" << std::endl;
-    ntt(a, n, roots, p, barrett_w, barrett_u);
-    debug_vector(a);
+    ntt(a, n, roots, p, barrett_w, barrett_u, stage);
+    export_vector_to_file(a, p, logn, stage);
 
     //std::cout << "========= intt ============" << std::endl;
     //intt(a, n, invroots, p, n_inv);
     //debug_vector(a);
 
-    //is_equal_polynomial(input, a);
+    is_equal_polynomial(input, a);
 }
