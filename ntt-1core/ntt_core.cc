@@ -47,45 +47,43 @@ int32_t barrett_2k(int32_t a, int32_t b, int32_t q, int32_t w, int32_t u){
 	}
 }
 
-void ntt_stage_parallel8(int32_t *pA1, int32_t *root_in, int32_t bf_width, int32_t root_idx, int32_t F, int32_t p, aie::vector<int32_t, vec_prime> &p_vector, int32_t w, aie::vector<int32_t, vec_prime> &u_vector){
-    for (int i = 0; i < F; i++){
-        int32_t cycle = bf_width / vec_prime;
-        int32_t idx_base = (i / cycle) * bf_width * 2 + (i % cycle) * vec_prime;
-        int32_t *__restrict pA1_i = pA1 + idx_base;
-        int32_t root = root_in[root_idx + i / cycle];
-        aie::vector<int32_t, vec_prime> v0 = aie::load_v<vec_prime>(pA1_i);
-        aie::vector<int32_t, vec_prime> v1 = aie::load_v<vec_prime>(pA1_i + bf_width);
-        aie::vector<int32_t, vec_prime> root_vector = aie::broadcast<int32_t, vec_prime>(root);
-       
-        // modadd(v0, v1, p)
-        aie::vector<int32_t, vec_prime> v2 = aie::add(v0, v1);
-        aie::mask<vec_prime> mask_v2_lt_p = aie::lt(v2, p_vector);
-        aie::vector<int32_t, vec_prime> over_v2 = aie::select(p, 0, mask_v2_lt_p);
-        aie::vector<int32_t, vec_prime> modadd = aie::sub(v2, over_v2);
+void ntt_stage_parallel8(aie::vector<int32_t, vec_prime> &v0, 
+                          aie::vector<int32_t, vec_prime> &v1,
+                          aie::vector<int32_t, vec_prime> &p_vector,
+                          aie::vector<int32_t, vec_prime> &root_vector,
+                          aie::vector<int32_t, vec_prime> &u_vector,
+                          int32_t *pOut_i,
+                          int32_t bf_width,
+                          int32_t p,
+                          int32_t w){
+    // modadd(v0, v1, p)
+    aie::vector<int32_t, vec_prime> v2 = aie::add(v0, v1);
+    aie::mask<vec_prime> mask_v2_lt_p = aie::lt(v2, p_vector);
+    aie::vector<int32_t, vec_prime> over_v2 = aie::select(p, 0, mask_v2_lt_p);
+    aie::vector<int32_t, vec_prime> modadd = aie::sub(v2, over_v2);
 
-        // modsub(v0, v1, p)
-        aie::vector<int32_t, vec_prime> v0_plus_p = aie::add(v0, p_vector);
-        aie::vector<int32_t, vec_prime> v3 = aie::sub(v0_plus_p, v1);
-        aie::mask<vec_prime> mask_v3_lt_p = aie::lt(v3, p_vector);
-        aie::vector<int32_t, vec_prime> over_v3 = aie::select(p, 0, mask_v3_lt_p);
-        aie::vector<int32_t, vec_prime> modsub = aie::sub(v3, over_v3);
-        
-        // barrett_2k(modsub(v0, v1, p), root, p, w, u);
-        aie::accum<acc64, vec_prime> t = aie::mul(modsub, root_vector);
-        aie::vector<int32_t, vec_prime> x_1 = t.template to_vector<int32_t>(w - 2);
-        aie::accum<acc64, vec_prime> x_2 = aie::mul(x_1, u_vector);
-        aie::vector<int32_t, vec_prime> s = x_2.template to_vector<int32_t>(w + 2);
-        aie::accum<acc64, vec_prime> r = aie::mul(s, p_vector);
-        aie::vector<int32_t, vec_prime> tt = t.template to_vector<int32_t>(0);
-        aie::vector<int32_t, vec_prime> rr = r.template to_vector<int32_t>(0);
-        aie::vector<int32_t, vec_prime> c = aie::sub(tt, rr);
-        aie::mask<vec_prime> mask_c_lt_p = aie::lt(c, p_vector);
-        aie::vector<int32_t, vec_prime> over_c = aie::select(p, 0, mask_c_lt_p);
-        aie::vector<int32_t, vec_prime> barrett = aie::sub(c, over_c);
+    // modsub(v0, v1, p)
+    aie::vector<int32_t, vec_prime> v0_plus_p = aie::add(v0, p_vector);
+    aie::vector<int32_t, vec_prime> v3 = aie::sub(v0_plus_p, v1);
+    aie::mask<vec_prime> mask_v3_lt_p = aie::lt(v3, p_vector);
+    aie::vector<int32_t, vec_prime> over_v3 = aie::select(p, 0, mask_v3_lt_p);
+    aie::vector<int32_t, vec_prime> modsub = aie::sub(v3, over_v3);
     
-        aie::store_v(pA1_i, modadd);
-        aie::store_v(pA1_i + bf_width, barrett);
-    }
+    // barrett_2k(modsub(v0, v1, p), root, p, w, u);
+    aie::accum<acc64, vec_prime> t = aie::mul(modsub, root_vector);
+    aie::vector<int32_t, vec_prime> x_1 = t.template to_vector<int32_t>(w - 2);
+    aie::accum<acc64, vec_prime> x_2 = aie::mul(x_1, u_vector);
+    aie::vector<int32_t, vec_prime> s = x_2.template to_vector<int32_t>(w + 2);
+    aie::accum<acc64, vec_prime> r = aie::mul(s, p_vector);
+    aie::vector<int32_t, vec_prime> tt = t.template to_vector<int32_t>(0);
+    aie::vector<int32_t, vec_prime> rr = r.template to_vector<int32_t>(0);
+    aie::vector<int32_t, vec_prime> c = aie::sub(tt, rr);
+    aie::mask<vec_prime> mask_c_lt_p = aie::lt(c, p_vector);
+    aie::vector<int32_t, vec_prime> over_c = aie::select(p, 0, mask_c_lt_p);
+    aie::vector<int32_t, vec_prime> barrett = aie::sub(c, over_c);
+
+    aie::store_v(pOut_i, modadd);
+    aie::store_v(pOut_i + bf_width, barrett);
 }
 
 extern "C" {
@@ -145,13 +143,23 @@ void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *root_in, int32_t *c_out, int3
   for (int stage = 3; stage < logN; stage++){
     bf_width *= 2;
     root_idx /= 2;
-    ntt_stage_parallel8(a_in, root_in, bf_width, root_idx, F, p, p_vector, w, u_vector);     
+    for (int i = 0; i < F; i++){
+      int32_t cycle = bf_width / vec_prime;
+      int32_t idx_base = (i / cycle) * bf_width * 2 + (i % cycle) * vec_prime;
+      int32_t *__restrict pA1_i = a_in + idx_base;
+      int32_t root = root_in[root_idx + i / cycle];
+      aie::vector<int32_t, vec_prime> v0 = aie::load_v<vec_prime>(pA1_i);
+      aie::vector<int32_t, vec_prime> v1 = aie::load_v<vec_prime>(pA1_i + bf_width);
+      aie::vector<int32_t, vec_prime> root_vector = aie::broadcast<int32_t, vec_prime>(root);
+      if (stage == logN - 1){
+        int32_t *__restrict pC_i = c_out + idx_base;
+        ntt_stage_parallel8(v0, v1, p_vector, root_vector, u_vector, pC_i, bf_width, p, w);     
+      }else {
+        ntt_stage_parallel8(v0, v1, p_vector, root_vector, u_vector, pA1_i, bf_width, p, w);     
+      }
+    }
   }
   event1();
-  // Write back
-  for (int i = 0; i < N; i++){
-    c_out[i] = a_in[i];  
-  }
 }
 
 } // extern "C"
