@@ -179,23 +179,26 @@ void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *root_in, int32_t *c_out, int3
     aie::store_v(pA_i, res);
   }
   event1();
-  
-  for (int i = 0; i < N; i++){
-    c_out[i] = a_in[i];
-  }
-
+ 
   // Stage 2
   event0();
   bf_width *= 2;
   root_idx /= 2;
-  for (int k = 0; k < N_half; k++){
-    int i = (k / bf_width) * 2 * bf_width + k % bf_width;
-    int j = i + bf_width;
-    int32_t v0 = a_in[i];
-    int32_t v1 = a_in[j];
-    int32_t root = root_in[root_idx + k / bf_width];
-    a_in[i] = modadd(v0, v1, p);
-    a_in[j] = barrett_2k(modsub(v0, v1, p), root, p, w, u);
+  for (int i = 0; i < N / vec_prime; i++){
+    int32_t *__restrict pA_i = a_in + i * vec_prime;
+    aie::vector<int32_t, vec_prime> v0 = aie::load_v<vec_prime>(pA_i);
+    aie::vector<int32_t, vec_prime> v0_l = aie::shuffle_down(v0, 4);
+    v0_l = vector_modadd(v0, v0_l, p_vector);
+    
+    aie::vector<int32_t, vec_prime> v0_r = aie::shuffle_up(v0, 4);
+    v0_r = vector_modsub(v0_r, v0, p_vector);
+    int32_t *__restrict pRoot_i = root_in + root_idx + i * vec_prime/8;
+    aie::vector<int32_t, vec_prime> root_vector = aie::broadcast<int32_t, vec_prime>(pRoot_i[0]);
+    v0_r = vector_barrett(v0_r, p_vector, root_vector, u_vector, w);
+    v0_r = aie::shuffle_down(v0_r, 4);
+
+    auto [res, res2] = aie::interleave_zip(v0_l, v0_r, 4);
+    aie::store_v(pA_i, res);
   }
   event1();
 
