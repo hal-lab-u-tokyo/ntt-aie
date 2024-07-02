@@ -145,7 +145,7 @@ int main(int argc, const char *argv[]) {
   bo_outC.sync(XCL_BO_SYNC_BO_FROM_DEVICE);
 
   // Compare out to golden
-  std::string filename = std::format("../../data/ans_q{}_n{}.txt", p, n);
+  std::string filename = std::format("../../data/ans_q{}_n{}_stage{}.txt", p, n, 1);
   std::ifstream ansFile(filename);
   if (!ansFile) {
       std::cerr << "Error opening file: " << filename << std::endl;

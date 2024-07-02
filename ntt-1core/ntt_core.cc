@@ -154,6 +154,10 @@ void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *root_in, int32_t *c_out, int3
   }
   event1();
 
+  for (int i = 0; i < N; i++){
+    c_out[i] = a_in[i];
+  }
+
   // Stage 1
   event0();
   bf_width *= 2;
@@ -180,6 +184,7 @@ void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *root_in, int32_t *c_out, int3
     aie::store_v(pA_i, res);
   }
   event1();
+/*
 
   // Stage 2
   event0();
@@ -218,6 +223,7 @@ void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *root_in, int32_t *c_out, int3
     }
   }
   event1();
+*/
 }
 
 } // extern "C"
