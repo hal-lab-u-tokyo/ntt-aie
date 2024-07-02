@@ -134,6 +134,8 @@ void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *root_in, int32_t *c_out, int3
 
   // Stage 0
   event0();
+  event1();
+  event0();
   for (int i = 0; i < N / vec_prime; i++){
     int32_t *__restrict pA_i = a_in + i * vec_prime;
     aie::vector<int32_t, vec_prime> v0 = aie::load_v<vec_prime>(pA_i);
@@ -153,10 +155,8 @@ void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *root_in, int32_t *c_out, int3
     auto [res, res2] = aie::interleave_zip(v0_l, v0_r, 1);
     aie::store_v(pA_i, res);
   }
-  event1();
 
   // Stage 1
-  event0();
   bf_width *= 2;
   root_idx /= 2;
   for (int i = 0; i < N / vec_prime; i++){
@@ -187,10 +187,8 @@ void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *root_in, int32_t *c_out, int3
     auto [res, res2] = aie::interleave_zip(v0_l0, v0_r1, 2);
     aie::store_v(pA_i, res);
   }
-  event1();
 
   // Stage 2
-  event0();
   bf_width *= 2;
   root_idx /= 2;
   for (int i = 0; i < N / vec_prime; i++){
@@ -215,10 +213,8 @@ void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *root_in, int32_t *c_out, int3
     auto [res, res2] = aie::interleave_zip(v0_l0, v0_r1, 4);
     aie::store_v(pA_i, res);
   }
-  event1();
 
   // Stage 3
-  event0();
   bf_width *= 2;
   root_idx /= 2;
   for (int i = 0; i < N / vec_prime; i++){
@@ -238,11 +234,9 @@ void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *root_in, int32_t *c_out, int3
     auto [res, res2] = aie::interleave_zip(v0_l, v0_r, 8);
     aie::store_v(pA_i, res);
   }
-  event1();
 
   // Stage 4 to Stage N-1
   for (int stage = 4; stage < logN; stage++){
-    event0();
     bf_width *= 2;
     root_idx /= 2;
     for (int i = 0; i < F; i++)
@@ -261,8 +255,8 @@ void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *root_in, int32_t *c_out, int3
         ntt_stage_parallel8(v0, v1, p_vector, root_vector, u_vector, pA_i, bf_width, p, w);     
       }
     }
-    event1();
   }
+  event1();
 }
 
 } // extern "C"

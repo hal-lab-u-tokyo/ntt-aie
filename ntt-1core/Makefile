@@ -7,6 +7,7 @@
 ##===----------------------------------------------------------------------===##
 
 srcdir := $(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
+LOGN = 8
 
 include ${srcdir}/../makefile-common
 
@@ -64,7 +65,7 @@ trace-win:
 
 trace-export:
 	mkdir -p trace
-	../utils/parse_trace.py --filename buildMSVS/trace.txt --mlir build/aie_trace.mlir --colshift 1 > trace/trace_vs.json
+	../utils/parse_trace.py --filename buildMSVS/trace.txt --mlir build/aie_trace.mlir --colshift 1 > ../profile/trace/trace_1core_n${LOGN}.json
 
 run_py: build/final.xclbin build/insts.txt
 	${powershell} python3 ${srcdir}/test.py -x build/final.xclbin -i build/insts.txt -k MLIR_AIE

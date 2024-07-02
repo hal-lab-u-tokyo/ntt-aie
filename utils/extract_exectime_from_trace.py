@@ -30,24 +30,25 @@ for i in range(3):
                     event0.append(entry['ts'])
                 if name == 'Event1' and phase == 'E':
                     event1.append(entry['ts'])
-            event0 = event0[1:]
 
             # Raw execution time
             clock = []
-            datalen = min(len(event0), len(event1))
-            for k in range(datalen):
-                clock.append(event0[k] - event1[k])
+            for k in range(len(event1) - 1):
+                clock.append(event1[k + 1] - event1[k])
             clock_average = sum(clock) / len(clock)
-            exectime = clock_average / (1.25 * 1000)
+            # exectime = clock_average / (1.25 * 10 ** 9) # s 
+            exectime = clock_average / 1.25 # ns 
 
             # Cal Utilization
-            flops_actually = 8 * n * j / (exectime * 0.0001)
-            flops_peak = (2 ** i) * 20000000 # N * 20GHz
-            utilization = flops_actually / flops_peak
-            print(f"exectime:{exectime}")
-            print(f"actualy:{flops_actually}")
-            print(f"peak:{flops_peak}")
-            print(f"utilization:{utilization}")
+            flops_ntt = 8 * j * (2 ** j)
+            flops_real = flops_ntt / exectime ## GFLOPS
+            flops_peak = (2 ** i) * 40        ## GFLOPS
+            utilization = flops_real / flops_peak
+            print(f"\texectime    :{exectime} ns")
+            print(f"\tNTT FLOPS   :{flops_ntt} FLOPS")
+            print(f"\tReal FLOPS  :{flops_real} GFLOPS")
+            print(f"\tPeak FLOPS  :{flops_peak} GFLOPS")
+            print(f"\tutilization :{utilization}")
 
         
             if i not in data:
