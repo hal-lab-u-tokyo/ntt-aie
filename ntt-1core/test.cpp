@@ -92,11 +92,6 @@ int main(int argc, const char *argv[]) {
   std::vector<int32_t> root(IN_VOLUME);
   root[0] = 1;
   make_roots(IN_VOLUME, root, p, g);
-  std::cout << "roots: ";
-  for (int i = IN_VOLUME / 2; i < IN_VOLUME; i++){
-      std::cout << root[i] << " ";
-  }
-  std::cout << std::endl;
   
   // Initialize buffer
   int32_t *bufInA = bo_inA.map<int32_t *>();
@@ -133,7 +128,7 @@ int main(int argc, const char *argv[]) {
     
     // Time
     float npu_time = std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count();
-    std::cout << "  Avg NPU NTT time: " << npu_time << "us." << std::endl;
+    std::cout << "  " << npu_time << "us." << std::endl;
   }
 
   
@@ -162,6 +157,7 @@ int main(int argc, const char *argv[]) {
       answers.push_back(ans);
   }
   
+  std::cout << "=================================: " << std::endl;
   int errors = 0;
   std::cout << "Verifying results ..." << std::endl;
   
@@ -181,13 +177,12 @@ int main(int argc, const char *argv[]) {
                                 vm["trace_file"].as<std::string>());
   }
 
-  std::cout << "=================================: " << std::endl;
   std::cout << "  logN: " << n << std::endl;
   std::cout << "  p: " << p << std::endl;
 
   // Print Pass/Fail result of our test
   if (!errors) {
-    std::cout << std::endl << " PASS!" << std::endl;
+    std::cout << "  PASS!" << std::endl;
     return 0;
   } else {
     std::cout << "  mismatches: " << errors << std::endl;
