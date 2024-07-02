@@ -128,7 +128,7 @@ int main(int argc, const char *argv[]) {
     
     // Time
     float npu_time = std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count();
-    std::cout << "  " << npu_time << "us." << std::endl;
+    std::cout << "  " << npu_time << std::endl;
   }
 
   
