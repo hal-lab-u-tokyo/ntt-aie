@@ -139,7 +139,7 @@ void is_equal_polynomial(std::vector<int64_t> &a, std::vector<int64_t> &b) {
 int main() {
     std::cout << "DFT" << std::endl;
     // Parameters
-    int64_t n = 1 << 10;
+    int64_t n = 1 << 5;
     //int64_t p = 998244353;
     //int64_t p = 65537;
     int64_t p = 3329;
