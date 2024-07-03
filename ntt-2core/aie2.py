@@ -27,7 +27,7 @@ def ntt():
     barrett_u = math.floor(pow(2, 2 * barrett_w) / p)
 
     n_column = 1
-    n_row = 1
+    n_row = 2
     n_core = n_column * n_row
     data_percolumn = N // n_column
     data_percore = N // n_core
@@ -38,15 +38,15 @@ def ntt():
     @device(AIEDevice.npu1_1col)
     def device_body():
         memRef_ty_vec = T.memref(N, T.i32())
-        memRef_ty_column = T.memref(N // n_column, T.i32())
-        memRef_ty_core = T.memref(N // n_core, T.i32())
-        memRef_ty_core_half = T.memref(N // (n_core * 2), T.i32())
+        memRef_ty_column = T.memref(data_percolumn, T.i32())
+        memRef_ty_core = T.memref(data_percore, T.i32())
+        memRef_ty_core_half = T.memref(data_percore // 2, T.i32())
         memRef_ty_scalar = T.memref(1, T.i32())
 
         # AIE Core Function declarations
         ntt_stage0_to_Nminus5 = external_func(
             "ntt_stage0_to_Nminus5",
-            inputs=[memRef_ty_core, memRef_ty_vec, memRef_ty_core, T.i32(), T.i32(), T.i32(), T.i32(), T.i32()],
+            inputs=[memRef_ty_core, memRef_ty_vec, memRef_ty_core, T.i32(), T.i32(), T.i32(), T.i32(), T.i32(), T.i32(), T.i32()],
         )
 
         # Tile declarations
@@ -99,11 +99,13 @@ def ntt():
         buffs_names = [[f"buff{c}_{r}" for r in range(n_row)] for c in range(n_column)]
         for c in range(n_column):
             for r in range(n_row):
-                buffs[c].append(Buffer(ComputeTiles[c][r], [N], T.i32(), buffs_names[c][r]))
+                buffs[c].append(Buffer(ComputeTiles[c][r], [data_percore], T.i32(), buffs_names[c][r]))
 
         # Set up a circuit-switched flow from core to shim for tracing information
+        """
         if trace_size > 0:
             flow(ComputeTiles[0][0], WireBundle.Trace, 0, ShimTiles[0], WireBundle.DMA, 1)
+        """
 
         # Set up compute tiles
         for c in range(n_column):
@@ -111,17 +113,20 @@ def ntt():
                 @core(ComputeTiles[c][r], "ntt_core.o")
                 def core_body():
                     # Effective while(1)
+                    core_idx = n_column * c + r
                     for _ in for_(sys.maxsize):
                         # Number of sub-vector "tile" iterations
                         elem_out = of_outs_core[c][r].acquire(ObjectFifoPort.Produce, 1)
                         elem_in = of_ins_core[c][r].acquire(ObjectFifoPort.Consume, 1)
                         elem_root = of_inroots_core[c].acquire(ObjectFifoPort.Consume, 1)
-                        call(ntt_stage0_to_Nminus5, [elem_in, elem_root, buffs[c][r], N, logN, p, barrett_w, barrett_u])
+                        call(ntt_stage0_to_Nminus5, [elem_in, elem_root, elem_out, data_percore, data_percore_log2, N, core_idx, p, barrett_w, barrett_u])
 
-                        for i in for_(N):
+                        """
+                        for i in for_(data_percore):
                             v0 = memref.load(buffs[c][r], [i])
                             memref.store(v0, elem_out, [i])
                             yield_([])
+                        """
                         of_ins_core[c][r].release(ObjectFifoPort.Consume, 1)
                         of_inroots_core[c].release(ObjectFifoPort.Consume, 1)
                         of_outs_core[c][r].release(ObjectFifoPort.Produce, 1)
@@ -129,7 +134,8 @@ def ntt():
 
         # To/from AIE-array data movement
         @FuncOp.from_py_func(memRef_ty_vec, memRef_ty_vec, memRef_ty_vec)
-        def sequence(A, root, C):
+        def sequence(input, root, output):
+            """
             if trace_size > 0:
                 trace_utils.configure_simple_tracing_aie2(
                     ComputeTiles[0][0],
@@ -138,10 +144,13 @@ def ntt():
                     size=trace_size,
                     offset=N_in_bytes,
                 )
+            """
+            
             for c in range(n_column):
-                offset = c * data_percolumn
-                npu_dma_memcpy_nd(metadata=of_outs_names[c], bd_id=c, mem=C, sizes=[1, 1, 1, data_percolumn], offsets=[0, 0, 0, offset])
-                npu_dma_memcpy_nd(metadata=of_ins_names[c], bd_id=n_column+c, mem=A, sizes=[1, 1, 1, data_percolumn], offsets=[0, 0, 0, offset])
+                size = N // n_column
+                offset = c * size
+                npu_dma_memcpy_nd(metadata=of_outs_names[c], bd_id=c, mem=output, sizes=[1, 1, 1, size], offsets=[0, 0, 0, offset])
+                npu_dma_memcpy_nd(metadata=of_ins_names[c], bd_id=n_column+c, mem=input, sizes=[1, 1, 1, size], offsets=[0, 0, 0, offset])
                 npu_dma_memcpy_nd(metadata=of_inroots_name[c], bd_id=2*n_column+c, mem=root, sizes=[1, 1, 1, N])
             npu_sync(column=0, row=0, direction=0, channel=0)
 

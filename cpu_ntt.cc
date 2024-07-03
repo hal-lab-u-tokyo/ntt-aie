@@ -173,7 +173,7 @@ int main() {
     int32_t barrett_u = std::floor(std::pow(2, 2 * barrett_w) / p);
     //std::cout << "(w, n_inv) = (" << w << ", " << n_inv << ")" << std::endl;
 
-    int stage = logn - 1;
+    int stage = 0;
 
     std::vector<int64_t> roots(n);
     std::vector<int64_t> invroots(n);
