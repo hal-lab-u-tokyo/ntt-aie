@@ -44,9 +44,15 @@ def ntt():
         memRef_ty_scalar = T.memref(1, T.i32())
 
         # AIE Core Function declarations
+        # void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *root_in, int32_t *c_out0, int32_t *c_out1, int32_t N, int32_t logN, int32_t N_all, int32_t core_idx, int32_t p, int32_t w, int32_t u) {
         ntt_stage0_to_Nminus5 = external_func(
             "ntt_stage0_to_Nminus5",
             inputs=[memRef_ty_core, memRef_ty_vec, memRef_ty_core_half, memRef_ty_core_half, T.i32(), T.i32(), T.i32(), T.i32(), T.i32(), T.i32(), T.i32()],
+        )
+        # void ntt_1stage(int32_t idx_stage, int32_t N, int32_t core_idx, int32_t n_core, int32_t *out0, int32_t *out1, int32_t *in0, int32_t *in1, int32_t *in_root, int32_t p, int32_t w, int32_t u) {
+        ntt_1stage = external_func(
+            "ntt_1stage",
+            inputs=[T.i32(), T.i32(), T.i32(), T.i32(), memRef_ty_core_half, memRef_ty_core_half, memRef_ty_core_half, memRef_ty_core_half, memRef_ty_vec, T.i32(), T.i32(), T.i32()],
         )
 
         # Tile declarations
@@ -123,6 +129,13 @@ def ntt():
                         elem_in = of_ins_core[c][r].acquire(ObjectFifoPort.Consume, 1)
                         elem_root = of_inroots_core[c].acquire(ObjectFifoPort.Consume, 1)
                         call(ntt_stage0_to_Nminus5, [elem_in, elem_root, buffs[c][r], buffs2[c][r], data_percore, data_percore_log2, N, core_idx, p, barrett_w, barrett_u])
+
+                        if r % 2 == 0:                        
+                            # void ntt_1stage_largeOut_even(int32_t idx_stage, int32_t N, int32_t core_idx, int32_t n_core, int32_t *out0, int32_t *out1, int32_t *in0, int32_t *in1, int32_t *in_root, int32_t p, int32_t w, int32_t u) {
+                            call(ntt_1stage, [0, data_percore, core_idx, n_core, buffs[c][r], buffs[c][r+1], buffs[c][r], buffs[c][r+1], elem_root, p, barrett_w, barrett_u])
+                        else:
+                            # void ntt_1stage_largeOut_odd(int32_t idx_stage, int32_t N, int32_t core_idx, int32_t n_core, int32_t *out0, int32_t *out1, int32_t *in0, int32_t *in1, int32_t *in_root, int32_t p, int32_t w, int32_t u) {
+                            call(ntt_1stage, [0, data_percore, core_idx, n_core, buffs2[c][r-1], buffs2[c][r], buffs2[c][r-1], buffs2[c][r], elem_root, p, barrett_w, barrett_u])
 
                         for i in for_(data_percore // 2):
                             v0 = memref.load(buffs[c][r], [i])
