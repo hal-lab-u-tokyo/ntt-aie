@@ -101,14 +101,23 @@ def ntt():
             object_fifo_link(of_outs_core[c], of_outs[c])
 
         # Buffer
-        buffs = [[] for c in range(n_column)]
-        buffs2 = [[] for c in range(n_column)]
-        buffs_names = [[f"buff{c}_{r}" for r in range(n_row)] for c in range(n_column)]
-        buffs2_names = [[f"buff2{c}_{r}" for r in range(n_row)] for c in range(n_column)]
+        buffs_a0 = [[] for c in range(n_column)]
+        buffs_a1 = [[] for c in range(n_column)]
+        buffs_a0_names = [[f"buffa0_{c}_{r}" for r in range(n_row)] for c in range(n_column)]
+        buffs_a1_names = [[f"buffa1_{c}_{r}" for r in range(n_row)] for c in range(n_column)]
         for c in range(n_column):
             for r in range(n_row):
-                buffs[c].append(Buffer(ComputeTiles[c][r], [data_percore // 2], T.i32(), buffs_names[c][r]))
-                buffs2[c].append(Buffer(ComputeTiles[c][r], [data_percore // 2], T.i32(), buffs2_names[c][r]))
+                buffs_a0[c].append(Buffer(ComputeTiles[c][r], [data_percore // 2], T.i32(), buffs_a0_names[c][r]))
+                buffs_a1[c].append(Buffer(ComputeTiles[c][r], [data_percore // 2], T.i32(), buffs_a1_names[c][r]))
+
+        buffs_b0 = [[] for c in range(n_column)]
+        buffs_b1 = [[] for c in range(n_column)]
+        buffs_b0_names = [[f"buffb0_{c}_{r}" for r in range(n_row)] for c in range(n_column)]
+        buffs_b1_names = [[f"buffb1_{c}_{r}" for r in range(n_row)] for c in range(n_column)]
+        for c in range(n_column):
+            for r in range(n_row):
+                buffs_b0[c].append(Buffer(ComputeTiles[c][r], [data_percore // 2], T.i32(), buffs_b0_names[c][r]))
+                buffs_b1[c].append(Buffer(ComputeTiles[c][r], [data_percore // 2], T.i32(), buffs_b1_names[c][r]))
 
         # Set up a circuit-switched flow from core to shim for tracing information
         """
@@ -132,21 +141,29 @@ def ntt():
                         # ============================
                         #    NTT Stage 0 to n-3
                         # ============================
-                        call(ntt_stage0_to_Nminus5, [elem_in, elem_root, buffs[c][r], buffs2[c][r], data_percore, data_percore_log2, N, core_idx, p, barrett_w, barrett_u])
+                        call(ntt_stage0_to_Nminus5, [elem_in, elem_root, buffs_a0[c][r], buffs_a1[c][r], data_percore, data_percore_log2, N, core_idx, p, barrett_w, barrett_u])
 
                         # ============================
                         #    NTT Stage n-2
                         # ============================
                         if r % 2 == 0:                        
                             # void ntt_1stage_largeOut_even(int32_t idx_stage, int32_t N, int32_t core_idx, int32_t n_core, int32_t *out0, int32_t *out1, int32_t *in0, int32_t *in1, int32_t *in_root, int32_t p, int32_t w, int32_t u) {
-                            call(ntt_1stage, [1, data_percore, core_idx, n_core, buffs[c][r], buffs[c][r+1], buffs[c][r], buffs[c][r+1], elem_root, p, barrett_w, barrett_u])
+                            call(ntt_1stage, [1, data_percore, core_idx, n_core, buffs_a0[c][r], buffs_a0[c][r+1], buffs_a0[c][r], buffs_a0[c][r+1], elem_root, p, barrett_w, barrett_u])
                         else:
                             # void ntt_1stage_largeOut_odd(int32_t idx_stage, int32_t N, int32_t core_idx, int32_t n_core, int32_t *out0, int32_t *out1, int32_t *in0, int32_t *in1, int32_t *in_root, int32_t p, int32_t w, int32_t u) {
-                            call(ntt_1stage, [1, data_percore, core_idx, n_core, buffs2[c][r-1], buffs2[c][r], buffs2[c][r-1], buffs2[c][r], elem_root, p, barrett_w, barrett_u])
+                            call(ntt_1stage, [1, data_percore, core_idx, n_core, buffs_a1[c][r-1], buffs_a1[c][r], buffs_a1[c][r-1], buffs_a1[c][r], elem_root, p, barrett_w, barrett_u])
+
+                        # ============================
+                        #    Swap
+                        # ============================
+
+                        # ============================
+                        #    NTT Stage n-1
+                        # ============================
 
                         for i in for_(data_percore // 2):
-                            v0 = memref.load(buffs[c][r], [i])
-                            v1 = memref.load(buffs2[c][r], [i])
+                            v0 = memref.load(buffs_a0[c][r], [i])
+                            v1 = memref.load(buffs_a1[c][r], [i])
                             memref.store(v0, elem_out, [i])
                             memref.store(v1, elem_out, [i + data_percore // 2])
                             yield_([])
