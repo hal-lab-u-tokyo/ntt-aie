@@ -46,7 +46,7 @@ def ntt():
         # AIE Core Function declarations
         ntt_stage0_to_Nminus5 = external_func(
             "ntt_stage0_to_Nminus5",
-            inputs=[memRef_ty_core, memRef_ty_vec, memRef_ty_core, T.i32(), T.i32(), T.i32(), T.i32(), T.i32(), T.i32(), T.i32()],
+            inputs=[memRef_ty_core, memRef_ty_vec, memRef_ty_core_half, memRef_ty_core_half, T.i32(), T.i32(), T.i32(), T.i32(), T.i32(), T.i32(), T.i32()],
         )
 
         # Tile declarations
@@ -96,10 +96,13 @@ def ntt():
 
         # Buffer
         buffs = [[] for c in range(n_column)]
+        buffs2 = [[] for c in range(n_column)]
         buffs_names = [[f"buff{c}_{r}" for r in range(n_row)] for c in range(n_column)]
+        buffs2_names = [[f"buff2{c}_{r}" for r in range(n_row)] for c in range(n_column)]
         for c in range(n_column):
             for r in range(n_row):
-                buffs[c].append(Buffer(ComputeTiles[c][r], [data_percore], T.i32(), buffs_names[c][r]))
+                buffs[c].append(Buffer(ComputeTiles[c][r], [data_percore // 2], T.i32(), buffs_names[c][r]))
+                buffs2[c].append(Buffer(ComputeTiles[c][r], [data_percore // 2], T.i32(), buffs2_names[c][r]))
 
         # Set up a circuit-switched flow from core to shim for tracing information
         """
@@ -119,14 +122,14 @@ def ntt():
                         elem_out = of_outs_core[c][r].acquire(ObjectFifoPort.Produce, 1)
                         elem_in = of_ins_core[c][r].acquire(ObjectFifoPort.Consume, 1)
                         elem_root = of_inroots_core[c].acquire(ObjectFifoPort.Consume, 1)
-                        call(ntt_stage0_to_Nminus5, [elem_in, elem_root, elem_out, data_percore, data_percore_log2, N, core_idx, p, barrett_w, barrett_u])
+                        call(ntt_stage0_to_Nminus5, [elem_in, elem_root, buffs[c][r], buffs2[c][r], data_percore, data_percore_log2, N, core_idx, p, barrett_w, barrett_u])
 
-                        """
-                        for i in for_(data_percore):
+                        for i in for_(data_percore // 2):
                             v0 = memref.load(buffs[c][r], [i])
+                            v1 = memref.load(buffs2[c][r], [i])
                             memref.store(v0, elem_out, [i])
+                            memref.store(v1, elem_out, [i + data_percore // 2])
                             yield_([])
-                        """
                         of_ins_core[c][r].release(ObjectFifoPort.Consume, 1)
                         of_inroots_core[c].release(ObjectFifoPort.Consume, 1)
                         of_outs_core[c][r].release(ObjectFifoPort.Produce, 1)

@@ -95,13 +95,13 @@ aie::vector<int32_t, vec_prime_half> vector_barrett(aie::vector<int32_t, vec_pri
   return barrett;
 }
 
-void ntt_stage_parallel8(aie::vector<int32_t, vec_prime> &v0, 
+void ntt_stage_parallel8(int32_t *pOut_i0,
+                          int32_t *pOut_i1,
+                          aie::vector<int32_t, vec_prime> &v0, 
                           aie::vector<int32_t, vec_prime> &v1,
                           aie::vector<int32_t, vec_prime> &p_vector,
                           aie::vector<int32_t, vec_prime> &root_vector,
                           aie::vector<int32_t, vec_prime> &u_vector,
-                          int32_t *pOut_i,
-                          int32_t bf_width,
                           int32_t p,
                           int32_t w){
     // modadd(v0, v1, p)
@@ -113,13 +113,13 @@ void ntt_stage_parallel8(aie::vector<int32_t, vec_prime> &v0,
     // barrett_2k(modsub(v0, v1, p), root, p, w, u);
     aie::vector<int32_t, vec_prime> barrett = vector_barrett(modsub, p_vector, root_vector, u_vector, w);
 
-    aie::store_v(pOut_i, modadd);
-    aie::store_v(pOut_i + bf_width, barrett);
+    aie::store_v(pOut_i0, modadd);
+    aie::store_v(pOut_i1, barrett);
 }
 
 extern "C" {
 
-void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *root_in, int32_t *c_out, int32_t N, int32_t logN, int32_t N_all, int32_t core_idx, int32_t p, int32_t w, int32_t u) {
+void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *root_in, int32_t *c_out0, int32_t *c_out1, int32_t N, int32_t logN, int32_t N_all, int32_t core_idx, int32_t p, int32_t w, int32_t u) {
   const int N_half = N / 2;
   const int32_t F = N_half / vec_prime;
   int32_t root_idx = N_all / 2;
@@ -248,10 +248,11 @@ void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *root_in, int32_t *c_out, int3
       aie::vector<int32_t, vec_prime> v1 = aie::load_v<vec_prime>(pA_i + bf_width);
       aie::vector<int32_t, vec_prime> root_vector = aie::broadcast<int32_t, vec_prime>(root);
       if (stage == logN - 1){
-        int32_t *__restrict pC_i = c_out + idx_base;
-        ntt_stage_parallel8(v0, v1, p_vector, root_vector, u_vector, pC_i, bf_width, p, w);     
+        int32_t *__restrict pC_i0 = c_out0 + idx_base;
+        int32_t *__restrict pC_i1 = c_out1 + idx_base;
+        ntt_stage_parallel8(pC_i0, pC_i1, v0, v1, p_vector, root_vector, u_vector, p, w);     
       }else {
-        ntt_stage_parallel8(v0, v1, p_vector, root_vector, u_vector, pA_i, bf_width, p, w);     
+        ntt_stage_parallel8(pA_i, pA_i + bf_width, v0, v1, p_vector, root_vector, u_vector, p, w);     
       }
     }
   }
