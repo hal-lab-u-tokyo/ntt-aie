@@ -19,7 +19,7 @@ import aie.utils.trace as trace_utils
 
 
 def ntt():
-    logN = 7
+    logN = 12
     N = 1 << logN
     N_in_bytes = N * 4
     p = 3329
@@ -118,13 +118,13 @@ def ntt():
         
         # Lock
         of_lock_up = [[] for c in range(n_column)]
-        of_lock_up_names = [[f"lock_updown{c}_{r}{r+1}" for r in range(0, n_row - 1)] for c in range(n_column)]
+        of_lock_up_names = [[f"lock_up{c}_{r}{r+1}" for r in range(0, n_row - 1)] for c in range(n_column)]
         for c in range(n_column):
             for r in range(n_row - 1):
-                of_lock_up[c].append(object_fifo(of_lock_up_names[c][r], ComputeTiles[c][r], ComputeTiles[c][r + 1], buffer_depth, memRef_ty_scalar))
+                of_lock_up[c].append(object_fifo(of_lock_up_names[c][r], ComputeTiles[c][r], ComputeTiles[c][r + 1], 1, memRef_ty_scalar))
 
-        # Set up a circuit-switched flow from core to shim for tracing information
         """
+        # Set up a circuit-switched flow from core to shim for tracing information
         if trace_size > 0:
             flow(ComputeTiles[0][0], WireBundle.Trace, 0, ShimTiles[0], WireBundle.DMA, 1)
         """
@@ -161,7 +161,7 @@ def ntt():
                         # ============================
                         # void swap(int32_t *a, int32_t *b, int32_t N)
                         if r == 1:                 
-                            of_lock_up[c][0].acquire(ObjectFifoPort.Consume, 1) 
+                            of_lock_up[c][0].acquire(ObjectFifoPort.Consume, 1)
                             # TODO: swap_buff doesn't work
                             # call(swap_buff, [buffs_a0[c][1], buffs_a0[c][2], data_percore // 2])
                             for i in for_(data_percore // 2):
@@ -170,9 +170,9 @@ def ntt():
                                 memref.store(v1, buffs_a0[c][1], [i])
                                 memref.store(v0, buffs_a0[c][2], [i])
                                 yield_([]) 
-                            of_lock_up[c][0].release(ObjectFifoPort.Consume, 1) 
+                            of_lock_up[c][0].release(ObjectFifoPort.Consume, 1)
                         elif r == 2:
-                            of_lock_up[c][2].acquire(ObjectFifoPort.Produce, 1) 
+                            of_lock_up[c][2].acquire(ObjectFifoPort.Produce, 1)
                             # TODO: swap_buff doesn't work
                             #call(swap_buff, [buffs_a1[c][1], buffs_a1[c][2], data_percore // 2])
                             for i in for_(data_percore // 2):
@@ -181,13 +181,18 @@ def ntt():
                                 memref.store(v1, buffs_a1[c][1], [i])
                                 memref.store(v0, buffs_a1[c][2], [i])
                                 yield_([]) 
-                            of_lock_up[c][2].release(ObjectFifoPort.Produce, 1) 
+                            of_lock_up[c][2].release(ObjectFifoPort.Produce, 1)
+                        else:
+                            # Dummy
+                            for i in for_(data_percore // 2):
+                                v0 = memref.load(buffs_a0[c][r], [i])
+                                memref.store(v0, buffs_a0[c][r], [i])
+                                yield_([]) 
 
                         # ============================
                         #    NTT Stage n-1
                         # ============================
                         # void ntt_1stage(int32_t idx_stage, int32_t N, int32_t core_idx, int32_t n_core, int32_t *out0, int32_t *out1, int32_t *in0, int32_t *in1, int32_t *in_root, int32_t p, int32_t w, int32_t u) {
-                        """
                         if r == 0:
                             of_lock_up[c][0].acquire(ObjectFifoPort.Produce, 1) 
                         if r == 3:
@@ -197,12 +202,6 @@ def ntt():
                             call(ntt_1stage, [0, data_percore, core_idx, n_core, buffs_a0[c][r], buffs_a0[c][r+1], buffs_a0[c][r], buffs_a0[c][r+1], elem_root, p, barrett_w, barrett_u])
                         else:
                             call(ntt_1stage, [0, data_percore, core_idx, n_core, buffs_a1[c][r-1], buffs_a1[c][r], buffs_a1[c][r-1], buffs_a1[c][r], elem_root, p, barrett_w, barrett_u])
-                        
-                        if r == 0:
-                            of_lock_up[c][0].release(ObjectFifoPort.Produce, 1) 
-                        if r == 3:
-                            of_lock_up[c][2].release(ObjectFifoPort.Consume, 1) 
-                        """
 
                         for i in for_(data_percore // 2):
                             v0 = memref.load(buffs_a0[c][r], [i])
