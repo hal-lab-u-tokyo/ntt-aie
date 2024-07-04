@@ -6,17 +6,19 @@ directory_path = "/mnt/c/Technical/ntt-aie/profile/exectime"
 
 data = {}
 
-for filename in os.listdir(directory_path):
-    if filename.endswith(".csv"):
-        parts = filename.split('_')
-        core = parts[1]  # e.g., 'core1'
-        logn = int(parts[2].replace('logn', '').replace('.csv', ''))  # e.g., '10' (as integer)
-        n = 2 ** logn
-        
-        file_path = os.path.join(directory_path, filename)
-        
-        print("reading...", file_path)
-        df = pd.read_csv(file_path, header=None)
+for i in range(5):
+    for j in range(8, 14):
+        n = 2 ** j
+        core = 2 ** i
+        fname = f"ntt_{2 ** i}core_logn{j}.csv"
+        filepath = os.path.join(directory_path, fname)
+
+        # Read CSV
+        print("reading...", filepath)
+        if not os.path.exists(filepath):
+            print("skip")
+            continue
+        df = pd.read_csv(filepath, header=None)
         if df.empty:
             print(f"{filename} is empty, skipped")
             continue
