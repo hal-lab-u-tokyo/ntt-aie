@@ -122,6 +122,18 @@ void ntt_stage_parallel8(int32_t *pOut_i0,
 
 extern "C" {
 
+void swap_buff(int32_t *a, int32_t *b, int32_t N) {
+  const int F = N / vec_prime;
+  for (int i = 0; i < F; i++){
+    int32_t *__restrict pa_i = a + i * vec_prime;
+    int32_t *__restrict pb_i = b + i * vec_prime;
+    aie::vector<int32_t, vec_prime> va_i = aie::load_v(pa_i);
+    aie::vector<int32_t, vec_prime> vb_i = aie::load_v(pb_i);
+    aie::store_v(pa_i, vb_i);
+    aie::store_v(pb_i, va_i);
+  }
+}
+
 void ntt_1stage(int32_t idx_stage, int32_t N, int32_t core_idx, int32_t n_core, int32_t *out0, int32_t *out1, int32_t *in0, int32_t *in1, int32_t *in_root, int32_t p, int32_t w, int32_t u) {
   // Stage N - 1 - idx_stage
   // idx_stage : 0, 1, 2, ...

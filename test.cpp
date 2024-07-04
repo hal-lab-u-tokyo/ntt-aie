@@ -151,10 +151,20 @@ int main(int argc, const char *argv[]) {
       std::cerr << "Error opening file: " << filename << std::endl;
       return 1;
   }
-  std::vector<int32_t> answers;
+  std::vector<int32_t> answers_input;
+  std::vector<int32_t> answers(IN_VOLUME);
   int ans;
   while (ansFile >> ans) {
-      answers.push_back(ans);
+      answers_input.push_back(ans);
+  }
+  const int block_num = 4;
+  std::array<int, block_num> base = {0, 1, 2, 3};
+  int block_size = IN_VOLUME / block_num;
+  for (int i = 0; i < block_num; i++){
+    int base_i = base[i] * block_size;
+    for (int j = 0; j < block_size; j++){
+      answers[base_i + j] = answers_input[i * block_size + j];
+    }
   }
   
   std::cout << "=================================: " << std::endl;
