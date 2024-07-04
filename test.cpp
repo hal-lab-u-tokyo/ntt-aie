@@ -158,7 +158,7 @@ int main(int argc, const char *argv[]) {
       answers_input.push_back(ans);
   }
   const int block_num = 4;
-  std::array<int, block_num> base = {0, 1, 2, 3};
+  std::array<int, block_num> base = {0, 2, 1, 3};
   int block_size = IN_VOLUME / block_num;
   for (int i = 0; i < block_num; i++){
     int base_i = base[i] * block_size;

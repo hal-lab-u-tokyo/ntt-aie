@@ -127,8 +127,10 @@ void swap_buff(int32_t *a, int32_t *b, int32_t N) {
   for (int i = 0; i < F; i++){
     int32_t *__restrict pa_i = a + i * vec_prime;
     int32_t *__restrict pb_i = b + i * vec_prime;
-    aie::vector<int32_t, vec_prime> va_i = aie::load_v(pa_i);
-    aie::vector<int32_t, vec_prime> vb_i = aie::load_v(pb_i);
+    //aie::vector<int32_t, vec_prime> va_i = aie::load_v(pa_i);
+    //aie::vector<int32_t, vec_prime> vb_i = aie::load_v(pb_i);
+    aie::vector<int32_t, vec_prime> va_i = aie::broadcast<int32_t, vec_prime>(11);
+    aie::vector<int32_t, vec_prime> vb_i = aie::broadcast<int32_t, vec_prime>(22);
     aie::store_v(pa_i, vb_i);
     aie::store_v(pb_i, va_i);
   }
