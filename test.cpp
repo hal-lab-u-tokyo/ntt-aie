@@ -44,7 +44,7 @@ void make_roots(int32_t n, std::vector<int32_t> &roots, int64_t p, int64_t g){
 int main(int argc, const char *argv[]) {
   constexpr int64_t p = 3329;
   constexpr int64_t g = 3;
-  constexpr int64_t n = 11;
+  constexpr int64_t n = 12;
   constexpr int64_t trace_size = 1 << 15;
   int IN_VOLUME = 1 << n;
   int OUT_VOLUME = IN_VOLUME + trace_size;
@@ -151,10 +151,20 @@ int main(int argc, const char *argv[]) {
       std::cerr << "Error opening file: " << filename << std::endl;
       return 1;
   }
-  std::vector<int32_t> answers;
+  std::vector<int32_t> answers_input;
+  std::vector<int32_t> answers(IN_VOLUME);
   int ans;
   while (ansFile >> ans) {
-      answers.push_back(ans);
+      answers_input.push_back(ans);
+  }
+  const int block_num = 4;
+  std::array<int, block_num> base = {0, 2, 1, 3};
+  int block_size = IN_VOLUME / block_num;
+  for (int i = 0; i < block_num; i++){
+    int base_i = base[i] * block_size;
+    for (int j = 0; j < block_size; j++){
+      answers[base_i + j] = answers_input[i * block_size + j];
+    }
   }
   
   std::cout << "=================================: " << std::endl;
@@ -165,7 +175,7 @@ int main(int argc, const char *argv[]) {
     int32_t ref = answers[i];
     int32_t test = bufOut[i];
     if (test != ref) {
-      std::cout << "[" << i << "] Error " << test << " != " << ref << std::endl;
+      //std::cout << "[" << i << "] Error " << test << " != " << ref << std::endl;
       errors++;
     } else {
       //std::cout << "[" << i << "] Correct " << test << " == " << ref << std::endl;

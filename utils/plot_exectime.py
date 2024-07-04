@@ -45,7 +45,7 @@ for core, n_data in data.items():
     execution_times = [n_data[logn] for logn in n_values]
     plt.plot(n_values, execution_times, marker='o', label=core)
 
-plt.axhline(y=time_empty_avg, color='darkred', linestyle='--')
+#plt.axhline(y=time_empty_avg, color='darkred', linestyle='--')
 
 plt.xticks(n_values)
 
