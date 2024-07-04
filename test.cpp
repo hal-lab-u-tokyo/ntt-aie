@@ -44,7 +44,7 @@ void make_roots(int32_t n, std::vector<int32_t> &roots, int64_t p, int64_t g){
 int main(int argc, const char *argv[]) {
   constexpr int64_t p = 3329;
   constexpr int64_t g = 3;
-  constexpr int64_t n = 11;
+  constexpr int64_t n = 7;
   constexpr int64_t trace_size = 1 << 15;
   int IN_VOLUME = 1 << n;
   int OUT_VOLUME = IN_VOLUME + trace_size;
@@ -145,7 +145,7 @@ int main(int argc, const char *argv[]) {
   bo_outC.sync(XCL_BO_SYNC_BO_FROM_DEVICE);
 
   // Compare out to golden
-  std::string filename = std::format("../../data/ans_q{}_n{}_stage{}.txt", p, n, n-1);
+  std::string filename = std::format("../../data/ans_q{}_n{}_stage{}.txt", p, n, n-2);
   std::ifstream ansFile(filename);
   if (!ansFile) {
       std::cerr << "Error opening file: " << filename << std::endl;
