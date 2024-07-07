@@ -19,7 +19,7 @@ import aie.utils.trace as trace_utils
 
 
 def ntt():
-    logN = 12
+    logN = 8
     N = 1 << logN
     N_in_bytes = N * 4
     p = 3329
@@ -129,8 +129,10 @@ def ntt():
                 of_lock_right[r].append(object_fifo(of_lock_right_names[r][c], ComputeTiles[c][r], ComputeTiles[c+1][r], 1, memRef_ty_scalar))
 
         # Set up a circuit-switched flow from core to shim for tracing information
+        """
         if trace_size > 0:
             flow(ComputeTiles[0][0], WireBundle.Trace, 0, ShimTiles[0], WireBundle.DMA, 1)
+        """
 
         # Set up compute tiles
         for c in range(n_column):
@@ -144,6 +146,7 @@ def ntt():
                         elem_out = of_outs_core[c][r].acquire(ObjectFifoPort.Produce, 1)
                         elem_in = of_ins_core[c][r].acquire(ObjectFifoPort.Consume, 1)
                         elem_root = of_inroots_core[c].acquire(ObjectFifoPort.Consume, 1)
+                        """
 
                         # ============================
                         #    NTT Stage 0 to n-5
@@ -281,6 +284,7 @@ def ntt():
                             memref.store(v1, elem_out, [i + data_percore // 2])
                             yield_([])
 
+                        """
                         of_ins_core[c][r].release(ObjectFifoPort.Consume, 1)
                         of_inroots_core[c].release(ObjectFifoPort.Consume, 1)
                         of_outs_core[c][r].release(ObjectFifoPort.Produce, 1)
@@ -289,14 +293,16 @@ def ntt():
         # To/from AIE-array data movement
         @FuncOp.from_py_func(memRef_ty_vec, memRef_ty_vec, memRef_ty_vec)
         def sequence(input, root, output):
+            """
             if trace_size > 0:
                 trace_utils.configure_simple_tracing_aie2(
                     ComputeTiles[0][0],
                     ShimTiles[0],
                     ddr_id=2,
                     size=trace_size,
-                    offset=N_in_bytes,
+                    offset=N_in_bytes * 3,
                 )
+            """
             
             for c in range(n_column):
                 size = N // n_column

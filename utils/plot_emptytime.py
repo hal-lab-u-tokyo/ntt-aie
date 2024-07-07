@@ -1,16 +1,17 @@
 import os
 import pandas as pd
 import matplotlib.pyplot as plt
+import math
 
-directory_path = "/mnt/c/Technical/ntt-aie/profile/exectime"
+directory_path = "/mnt/c/Technical/ntt-aie/profile/empty"
 
 data = {}
 
-for i in range(5):
-    for j in range(9, 14):
+for i in range(4, 5):
+    for j in range(8, 13):
         n = 2 ** j
         core = 2 ** i
-        fname = f"ntt_{2 ** i}core_logn{j}.csv"
+        fname = f"empty_{2 ** i}core_n{j}.csv"
         filepath = os.path.join(directory_path, fname)
 
         # Read CSV
@@ -39,9 +40,11 @@ if df.empty:
 time_empty_avg = df.mean().values[0]
 print(time_empty_avg)
 
-plt.figure(figsize=(10, 6))
-
 print(data)
+
+
+fig, ax = plt.subplots(figsize=(10, 6))
+
 for core, n_data in data.items():
     n_values = sorted(n_data.keys())
     execution_times = [n_data[logn] for logn in n_values]
@@ -49,8 +52,11 @@ for core, n_data in data.items():
 
 #plt.axhline(y=time_empty_avg, color='darkred', linestyle='--')
 
-plt.xticks(n_values)
+def format_func(value, tick_number):
+    return f'$2^{{{int(math.log2(value))}}}$'
 
+plt.xticks([2 ** i for i in range(8, 14)], fontsize=16)
+ax.xaxis.set_major_formatter(plt.FuncFormatter(format_func))
 plt.xlabel('Data size', fontsize=20)
 plt.ylabel('Execution Time (us)', fontsize=20)
 plt.tick_params(labelsize=16)
