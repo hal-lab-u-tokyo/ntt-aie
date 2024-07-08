@@ -34,8 +34,9 @@ def my_vector_scalar():
         memRef_scalar = T.memref(1, T.i32())
 
         # AIE Core Function declarations
+        # void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *root_in, int32_t *c_out0, int32_t *c_out1, int32_t N, int32_t logN, int32_t p, int32_t w, int32_t u) {
         ntt_stage0_to_Nminus5 = external_func(
-            "ntt_stage0_to_Nminus5",
+            "ntt_stage0_to_Nminus5_1core",
             inputs=[memRef_vec, memRef_vec, memRef_vec, T.i32(), T.i32(), T.i32(), T.i32(), T.i32()],
         )
 

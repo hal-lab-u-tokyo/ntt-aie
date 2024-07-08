@@ -42,9 +42,14 @@ void make_roots(int32_t n, std::vector<int32_t> &roots, int64_t p, int64_t g){
 }
 
 int main(int argc, const char *argv[]) {
+  constexpr int64_t n = 7;
+  constexpr int32_t test_stage = n - 1;
+  const int block_num = 4;
+  std::array<int, block_num> ans_order = {0, 1, 2, 3};
+
+  
   constexpr int64_t p = 3329;
   constexpr int64_t g = 3;
-  constexpr int64_t n = 8;
   constexpr int64_t trace_size = 1 << 15;
   int IN_VOLUME = 1 << n;
   int OUT_VOLUME = IN_VOLUME + trace_size;
@@ -145,7 +150,7 @@ int main(int argc, const char *argv[]) {
   bo_outC.sync(XCL_BO_SYNC_BO_FROM_DEVICE);
 
   // Compare out to golden
-  std::string filename = std::format("../../data/ans_q{}_n{}_stage{}.txt", p, n, n-1);
+  std::string filename = std::format("../../data/ans_q{}_n{}_stage{}.txt", p, n, test_stage);
   std::ifstream ansFile(filename);
   if (!ansFile) {
       std::cerr << "Error opening file: " << filename << std::endl;
@@ -157,11 +162,9 @@ int main(int argc, const char *argv[]) {
   while (ansFile >> ans) {
       answers_input.push_back(ans);
   }
-  const int block_num = 4;
-  std::array<int, block_num> base = {0, 2, 1, 3};
   int block_size = IN_VOLUME / block_num;
   for (int i = 0; i < block_num; i++){
-    int base_i = base[i] * block_size;
+    int base_i = ans_order[i] * block_size;
     for (int j = 0; j < block_size; j++){
       answers[base_i + j] = answers_input[i * block_size + j];
     }
@@ -175,7 +178,7 @@ int main(int argc, const char *argv[]) {
     int32_t ref = answers[i];
     int32_t test = bufOut[i];
     if (test != ref) {
-      //std::cout << "[" << i << "] Error " << test << " != " << ref << std::endl;
+      std::cout << "[" << i << "] Error " << test << " != " << ref << std::endl;
       errors++;
     } else {
       //std::cout << "[" << i << "] Correct " << test << " == " << ref << std::endl;
