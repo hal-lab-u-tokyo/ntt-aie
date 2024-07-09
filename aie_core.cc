@@ -196,7 +196,7 @@ void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *root_in, int32_t *c_out0, int
     auto [res, res2] = aie::interleave_zip(v0_l, v0_r, 1);
     aie::store_v(pA_i, res);
   }
-
+  
   // Stage 1
   bf_width *= 2;
   root_idx /= 2;

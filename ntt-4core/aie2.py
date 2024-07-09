@@ -19,7 +19,7 @@ import aie.utils.trace as trace_utils
 
 
 def ntt():
-    logN = 12
+    logN = 7
     N = 1 << logN
     N_in_bytes = N * 4
     p = 3329
@@ -123,6 +123,12 @@ def ntt():
             for r in range(n_row - 1):
                 of_lock_up[c].append(object_fifo(of_lock_up_names[c][r], ComputeTiles[c][r], ComputeTiles[c][r + 1], 1, memRef_ty_scalar))
 
+        of_lock_down = [[] for c in range(n_column)]
+        of_lock_down_names = [[f"lock_down{c}_{r}{r+1}" for r in range(0, n_row - 1)] for c in range(n_column)]
+        for c in range(n_column):
+            for r in range(n_row - 1):
+                of_lock_down[c].append(object_fifo(of_lock_down_names[c][r], ComputeTiles[c][r + 1], ComputeTiles[c][r], 1, memRef_ty_scalar))
+
         """
         # Set up a circuit-switched flow from core to shim for tracing information
         if trace_size > 0:
@@ -160,8 +166,9 @@ def ntt():
                         #    Swap
                         # ============================
                         # void swap(int32_t *a, int32_t *b, int32_t N)
+                        
                         if r == 1:                 
-                            of_lock_up[c][0].acquire(ObjectFifoPort.Consume, 1)
+                            of_lock_down[c][0].acquire(ObjectFifoPort.Produce, 1)
                             # TODO: swap_buff doesn't work
                             # call(swap_buff, [buffs_a0[c][1], buffs_a0[c][2], data_percore // 2])
                             for i in for_(data_percore // 2):
@@ -170,7 +177,7 @@ def ntt():
                                 memref.store(v1, buffs_a0[c][1], [i])
                                 memref.store(v0, buffs_a0[c][2], [i])
                                 yield_([]) 
-                            of_lock_up[c][0].release(ObjectFifoPort.Consume, 1)
+                            of_lock_down[c][0].release(ObjectFifoPort.Produce, 1)
                         elif r == 2:
                             of_lock_up[c][2].acquire(ObjectFifoPort.Produce, 1)
                             # TODO: swap_buff doesn't work
@@ -188,21 +195,24 @@ def ntt():
                                 v0 = memref.load(buffs_a0[c][r], [i])
                                 memref.store(v0, buffs_a0[c][r], [i])
                                 yield_([]) 
-
+                        
                         # ============================
                         #    NTT Stage n-1
                         # ============================
                         # void ntt_1stage(int32_t idx_stage, int32_t N, int32_t core_idx, int32_t n_core, int32_t *out0, int32_t *out1, int32_t *in0, int32_t *in1, int32_t *in_root, int32_t p, int32_t w, int32_t u) {
                         if r == 0:
-                            of_lock_up[c][0].acquire(ObjectFifoPort.Produce, 1) 
+                            of_lock_down[c][0].acquire(ObjectFifoPort.Consume, 1) 
                         if r == 3:
                             of_lock_up[c][2].acquire(ObjectFifoPort.Consume, 1) 
-
+                        
                         if r % 2 == 0:                        
                             call(ntt_1stage, [0, data_percore, core_idx, n_core, buffs_a0[c][r], buffs_a0[c][r+1], buffs_a0[c][r], buffs_a0[c][r+1], elem_root, p, barrett_w, barrett_u])
                         else:
                             call(ntt_1stage, [0, data_percore, core_idx, n_core, buffs_a1[c][r-1], buffs_a1[c][r], buffs_a1[c][r-1], buffs_a1[c][r], elem_root, p, barrett_w, barrett_u])
-
+                        
+                        # ============================
+                        #    Write Back
+                        # ============================
                         for i in for_(data_percore // 2):
                             v0 = memref.load(buffs_a0[c][r], [i])
                             v1 = memref.load(buffs_a1[c][r], [i])
@@ -211,7 +221,7 @@ def ntt():
                             yield_([])
 
                         if r == 0:
-                            of_lock_up[c][0].release(ObjectFifoPort.Produce, 1) 
+                            of_lock_down[c][0].release(ObjectFifoPort.Consume, 1) 
                         if r == 3:
                             of_lock_up[c][2].release(ObjectFifoPort.Consume, 1) 
 

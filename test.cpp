@@ -42,12 +42,17 @@ void make_roots(int32_t n, std::vector<int32_t> &roots, int64_t p, int64_t g){
 }
 
 int main(int argc, const char *argv[]) {
+  // ============================
+  // Test Parameters
+  // ============================
   constexpr int64_t n = 7;
   constexpr int32_t test_stage = n - 1;
   const int block_num = 4;
-  std::array<int, block_num> ans_order = {0, 1, 2, 3};
+  std::array<int, block_num> ans_order = {0, 2, 1, 3};
 
-  
+  // ============================
+  // Constants
+  // ============================
   constexpr int64_t p = 3329;
   constexpr int64_t g = 3;
   constexpr int64_t trace_size = 1 << 15;
@@ -55,7 +60,9 @@ int main(int argc, const char *argv[]) {
   int OUT_VOLUME = IN_VOLUME + trace_size;
   constexpr bool VERIFY = true;
   
+  // ============================
   // Program arguments parsing
+  // ============================
   po::options_description desc("Allowed options");
   po::variables_map vm;
   test_utils::add_default_options(desc);
@@ -66,7 +73,9 @@ int main(int argc, const char *argv[]) {
   int IN_SIZE = IN_VOLUME * sizeof(int32_t);
   int OUT_SIZE = OUT_VOLUME * sizeof(int32_t) + trace_size;
 
-  // Load instruction sequence
+  // ============================
+  // Load instructions and data
+  // ============================
   std::vector<uint32_t> instr_v =
       test_utils::load_instr_sequence(vm["instr"].as<std::string>());
 
@@ -93,16 +102,14 @@ int main(int argc, const char *argv[]) {
   void *bufInstr = bo_instr.map<void *>();
   memcpy(bufInstr, instr_v.data(), instr_v.size() * sizeof(int));
 
-  // Initialize root
-  std::vector<int32_t> root(IN_VOLUME);
-  root[0] = 1;
-  make_roots(IN_VOLUME, root, p, g);
-  
   // Initialize buffer
   int32_t *bufInA = bo_inA.map<int32_t *>();
   int32_t *bufRoot = bo_root.map<int32_t *>();
   int32_t *bufInFactor = bo_prime.map<int32_t *>();
   int32_t *bufOut = bo_outC.map<int32_t *>();
+  std::vector<int32_t> root(IN_VOLUME);
+  root[0] = 1;
+  make_roots(IN_VOLUME, root, p, g);
   for (int i = 0; i < IN_VOLUME; i++){
     bufInA[i] = i;
     bufRoot[i] = root[i];
@@ -114,10 +121,11 @@ int main(int argc, const char *argv[]) {
   bo_instr.sync(XCL_BO_SYNC_BO_TO_DEVICE);
   bo_inA.sync(XCL_BO_SYNC_BO_TO_DEVICE);
   bo_root.sync(XCL_BO_SYNC_BO_TO_DEVICE);
-  // bo_prime.sync(XCL_BO_SYNC_BO_TO_DEVICE);
   bo_outC.sync(XCL_BO_SYNC_BO_TO_DEVICE);
 
-  // Execute the kernel and wait to finish
+  // ============================
+  // Execute the kernel 10 times
+  // ============================
   std::cout << "Running Kernel.\n";
   for (int i = 0; i < 10; i++){
     auto start = std::chrono::high_resolution_clock::now();
@@ -136,7 +144,9 @@ int main(int argc, const char *argv[]) {
     std::cout << npu_time << std::endl;
   }
 
-  
+  // ============================
+  // Execute the kernel for test
+  // ============================
   auto start = std::chrono::high_resolution_clock::now();
   auto run = kernel(bo_instr, instr_v.size(), bo_inA, bo_root, bo_outC);
   ert_cmd_state r = run.wait();
@@ -149,7 +159,14 @@ int main(int argc, const char *argv[]) {
   // Sync device to host memories
   bo_outC.sync(XCL_BO_SYNC_BO_FROM_DEVICE);
 
-  // Compare out to golden
+  if (trace_size > 0) {
+    test_utils::write_out_trace(((char *)bufOut) + IN_SIZE, trace_size,
+                                vm["trace_file"].as<std::string>());
+  }
+
+  // ============================
+  // Veryfy Results
+  // ============================
   std::string filename = std::format("../../data/ans_q{}_n{}_stage{}.txt", p, n, test_stage);
   std::ifstream ansFile(filename);
   if (!ansFile) {
@@ -185,15 +202,10 @@ int main(int argc, const char *argv[]) {
     }
   }
 
-  if (trace_size > 0) {
-    test_utils::write_out_trace(((char *)bufOut) + IN_SIZE, trace_size,
-                                vm["trace_file"].as<std::string>());
-  }
 
   std::cout << "  logN: " << n << std::endl;
   std::cout << "  p: " << p << std::endl;
 
-  // Print Pass/Fail result of our test
   if (!errors) {
     std::cout << "  PASS!" << std::endl;
     return 0;
