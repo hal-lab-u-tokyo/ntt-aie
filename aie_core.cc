@@ -228,6 +228,7 @@ void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *root_in, int32_t *c_out0, int
     auto [res, res2] = aie::interleave_zip(v0_l0, v0_r1, 2);
     aie::store_v(pA_i, res);
   }
+
   // Stage 2
   bf_width *= 2;
   root_idx /= 2;
@@ -295,6 +296,12 @@ void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *root_in, int32_t *c_out0, int
       }
     }
   }
+  /*
+  for (int i = 0; i < N / 2; i++){
+    c_out0[i] = a_in[i];
+    c_out1[i] = a_in[i + N / 2];
+  }
+  */
   event1();
 }
 

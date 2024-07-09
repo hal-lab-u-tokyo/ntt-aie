@@ -19,7 +19,7 @@ import aie.utils.trace as trace_utils
 
 
 def ntt():
-    logN = 7
+    logN = 8
     N = 1 << logN
     N_in_bytes = N * 4
     p = 3329
@@ -122,11 +122,12 @@ def ntt():
         for c in range(n_column):
             for r in range(n_row - 1):
                 of_lock_up[c].append(object_fifo(of_lock_up_names[c][r], ComputeTiles[c][r], ComputeTiles[c][r + 1], 1, memRef_ty_scalar))
-        of_lock_right = [[] for r in range(n_row)]
-        of_lock_right_names = [[f"lock_right{c}{r}_{c+1}{r}" for c in range(0, n_column - 1)] for r in range(n_row)]
-        for r in range(n_row):
-            for c in range(n_column - 1):
-                of_lock_right[r].append(object_fifo(of_lock_right_names[r][c], ComputeTiles[c][r], ComputeTiles[c+1][r], 1, memRef_ty_scalar))
+
+        of_lock_down = [[] for c in range(n_column)]
+        of_lock_down_names = [[f"lock_down{c}_{r}{r+1}" for r in range(0, n_row - 1)] for c in range(n_column)]
+        for c in range(n_column):
+            for r in range(n_row - 1):
+                of_lock_down[c].append(object_fifo(of_lock_down_names[c][r], ComputeTiles[c][r + 1], ComputeTiles[c][r], 1, memRef_ty_scalar))
 
         """
         # Set up a circuit-switched flow from core to shim for tracing information
@@ -140,7 +141,7 @@ def ntt():
                 @core(ComputeTiles[c][r], "ntt_core.o")
                 def core_body():
                     # Effective while(1)
-                    core_idx = n_column * c + r
+                    core_idx = n_row * c + r
                     for _ in for_(sys.maxsize):
                         # Number of sub-vector "tile" iterations
                         elem_out = of_outs_core[c][r].acquire(ObjectFifoPort.Produce, 1)
@@ -151,7 +152,7 @@ def ntt():
                         #    NTT Stage 0 to n-4
                         # ============================
                         call(ntt_stage0_to_Nminus5, [elem_in, elem_root, buffs_a0[c][r], buffs_a1[c][r], data_percore, data_percore_log2, N, core_idx, p, barrett_w, barrett_u])
-
+                            
                         # ============================
                         #    NTT Stage n-3
                         # ============================
@@ -161,12 +162,14 @@ def ntt():
                         else:
                             call(ntt_1stage, [2, data_percore, core_idx, n_core, buffs_a1[c][r-1], buffs_a1[c][r], buffs_a1[c][r-1], buffs_a1[c][r], elem_root, p, barrett_w, barrett_u])
 
+
                         # ============================
                         #    Swap
                         # ============================
                         # void swap(int32_t *a, int32_t *b, int32_t N)
+                        
                         if r == 1:                 
-                            of_lock_up[c][0].acquire(ObjectFifoPort.Consume, 1)
+                            of_lock_down[c][0].acquire(ObjectFifoPort.Produce, 1)
                             # TODO: swap_buff doesn't work
                             # call(swap_buff, [buffs_a0[c][1], buffs_a0[c][2], data_percore // 2])
                             for i in for_(data_percore // 2):
@@ -175,7 +178,7 @@ def ntt():
                                 memref.store(v1, buffs_a0[c][1], [i])
                                 memref.store(v0, buffs_a0[c][2], [i])
                                 yield_([]) 
-                            of_lock_up[c][0].release(ObjectFifoPort.Consume, 1)
+                            of_lock_down[c][0].release(ObjectFifoPort.Produce, 1)
                         elif r == 2:
                             of_lock_up[c][2].acquire(ObjectFifoPort.Produce, 1)
                             # TODO: swap_buff doesn't work
@@ -193,49 +196,50 @@ def ntt():
                                 v0 = memref.load(buffs_a0[c][r], [i])
                                 memref.store(v0, buffs_a0[c][r], [i])
                                 yield_([]) 
-
+                        
                         # ============================
                         #    NTT Stage n-2
                         # ============================
                         # void ntt_1stage(int32_t idx_stage, int32_t N, int32_t core_idx, int32_t n_core, int32_t *out0, int32_t *out1, int32_t *in0, int32_t *in1, int32_t *in_root, int32_t p, int32_t w, int32_t u) {
                         if r == 0:
-                            of_lock_up[c][0].acquire(ObjectFifoPort.Produce, 1) 
+                            of_lock_down[c][0].acquire(ObjectFifoPort.Consume, 1) 
                         if r == 3:
                             of_lock_up[c][2].acquire(ObjectFifoPort.Consume, 1) 
-
+                        
                         if r % 2 == 0:                        
                             call(ntt_1stage, [1, data_percore, core_idx, n_core, buffs_a0[c][r], buffs_a0[c][r+1], buffs_a0[c][r], buffs_a0[c][r+1], elem_root, p, barrett_w, barrett_u])
                         else:
                             call(ntt_1stage, [1, data_percore, core_idx, n_core, buffs_a1[c][r-1], buffs_a1[c][r], buffs_a1[c][r-1], buffs_a1[c][r], elem_root, p, barrett_w, barrett_u])
-
-                        if r == 0:
-                            of_lock_up[c][0].release(ObjectFifoPort.Produce, 1) 
-                        if r == 3:
-                            of_lock_up[c][2].release(ObjectFifoPort.Consume, 1) 
                         
-                        # ============================
-                        #    NTT Stage n-2
-                        # ============================
-                        if c % 2 == 1:                        
-                            of_lock_right[r][c//2].acquire(ObjectFifoPort.Consume, 1) 
-                            call(ntt_1stage, [0, data_percore, core_idx, n_core, buffs_a0[c-1][r], buffs_a0[c][r], buffs_a0[c-1][r], buffs_a0[c][r], elem_root, p, barrett_w, barrett_u])
-                            call(ntt_1stage, [0, data_percore, core_idx, n_core, buffs_a1[c-1][r], buffs_a1[c][r], buffs_a1[c-1][r], buffs_a1[c][r], elem_root, p, barrett_w, barrett_u])
-                            of_lock_right[r][c//2].release(ObjectFifoPort.Consume, 1) 
-
-                        if c % 2 == 0:
-                            of_lock_right[r][c//2].acquire(ObjectFifoPort.Produce, 1) 
-
                         for i in for_(data_percore // 2):
                             v0 = memref.load(buffs_a0[c][r], [i])
                             v1 = memref.load(buffs_a1[c][r], [i])
                             memref.store(v0, elem_out, [i])
                             memref.store(v1, elem_out, [i + data_percore // 2])
                             yield_([])
+                        if r == 0:
+                            of_lock_down[c][0].release(ObjectFifoPort.Consume, 1) 
+                        if r == 3:
+                            of_lock_up[c][2].release(ObjectFifoPort.Consume, 1) 
                         
-                        if c % 2 == 0:
-                            of_lock_right[r][c//2].release(ObjectFifoPort.Produce, 1) 
+                        """
+                        
+                        # ============================
+                        #    Write Back
+                        # ============================
+                        for i in for_(data_percore // 2):
+                            v0 = memref.load(buffs_a0[c][r], [i])
+                            v1 = memref.load(buffs_a1[c][r], [i])
+                            memref.store(v0, elem_out, [i])
+                            memref.store(v1, elem_out, [i + data_percore // 2])
+                            yield_([])
 
+                        if r == 0:
+                            of_lock_down[c][0].release(ObjectFifoPort.Consume, 1) 
+                        if r == 3:
+                            of_lock_up[c][2].release(ObjectFifoPort.Consume, 1) 
 
+                        """
                         of_ins_core[c][r].release(ObjectFifoPort.Consume, 1)
                         of_inroots_core[c].release(ObjectFifoPort.Consume, 1)
                         of_outs_core[c][r].release(ObjectFifoPort.Produce, 1)

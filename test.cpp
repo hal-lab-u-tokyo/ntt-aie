@@ -45,10 +45,10 @@ int main(int argc, const char *argv[]) {
   // ============================
   // Test Parameters
   // ============================
-  constexpr int64_t n = 7;
-  constexpr int32_t test_stage = n - 1;
-  const int block_num = 4;
-  std::array<int, block_num> ans_order = {0, 1, 2, 3};
+  constexpr int64_t n = 8;
+  constexpr int32_t test_stage = 6;  
+  const int block_num = 8;
+  std::array<int, block_num> ans_order = {0, 2, 1, 3, 4, 6, 5, 7};
   
   // ============================
   // Constants
