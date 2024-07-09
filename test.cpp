@@ -48,18 +48,17 @@ int main(int argc, const char *argv[]) {
   constexpr int64_t n = 7;
   constexpr int32_t test_stage = n - 1;
   const int block_num = 4;
-  std::array<int, block_num> ans_order = {0, 2, 1, 3};
-
+  std::array<int, block_num> ans_order = {0, 1, 2, 3};
+  
   // ============================
   // Constants
   // ============================
   constexpr int64_t p = 3329;
   constexpr int64_t g = 3;
-  constexpr int64_t trace_size = 1 << 15;
-  int IN_VOLUME = 1 << n;
-  int OUT_VOLUME = IN_VOLUME + trace_size;
   constexpr bool VERIFY = true;
-  
+  int IN_VOLUME = 1 << n;
+  int OUT_VOLUME = IN_VOLUME;
+
   // ============================
   // Program arguments parsing
   // ============================
@@ -69,6 +68,8 @@ int main(int argc, const char *argv[]) {
 
   test_utils::parse_options(argc, argv, desc, vm);
   int verbosity = vm["verbosity"].as<int>();
+  int trace_size = vm["trace_sz"].as<int>();
+  printf("trace size: %d\n", trace_size);
 
   int IN_SIZE = IN_VOLUME * sizeof(int32_t);
   int OUT_SIZE = OUT_VOLUME * sizeof(int32_t) + trace_size;
@@ -158,8 +159,10 @@ int main(int argc, const char *argv[]) {
   
   // Sync device to host memories
   bo_outC.sync(XCL_BO_SYNC_BO_FROM_DEVICE);
-
+  
+  std::cout << "=================================" << std::endl;
   if (trace_size > 0) {
+    std::cout << "Writing trace output to " << vm["trace_file"].as<std::string>() << std::endl;
     test_utils::write_out_trace(((char *)bufOut) + IN_SIZE, trace_size,
                                 vm["trace_file"].as<std::string>());
   }
@@ -187,7 +190,6 @@ int main(int argc, const char *argv[]) {
     }
   }
   
-  std::cout << "=================================: " << std::endl;
   int errors = 0;
   std::cout << "Verifying results with " << filename << std::endl;
   
