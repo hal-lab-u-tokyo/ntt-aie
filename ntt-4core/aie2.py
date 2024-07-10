@@ -18,7 +18,7 @@ from aie.extras.dialects.ext import memref, arith
 import aie.utils.trace as trace_utils
 
 
-def ntt():
+def ntt(trace_size):
     logN = 11
     N = 1 << logN
     N_in_bytes = N * 4
@@ -129,12 +129,10 @@ def ntt():
             for r in range(n_row - 1):
                 of_lock_down[c].append(object_fifo(of_lock_down_names[c][r], ComputeTiles[c][r + 1], ComputeTiles[c][r], 1, memRef_ty_scalar))
 
-        """
         # Set up a circuit-switched flow from core to shim for tracing information
         if trace_size > 0:
-            flow(ComputeTiles[0][0], WireBundle.Trace, 0, ShimTiles[0], WireBundle.DMA, 1)
-        """
-
+            packetflow(0, ComputeTiles[0][0], WireBundle.Trace, 0, ShimTiles[0], WireBundle.DMA, 1, keep_pkt_header=True) # core trace
+            
         # Set up compute tiles
         for c in range(n_column):
             for r in range(n_row):
@@ -233,16 +231,14 @@ def ntt():
         # To/from AIE-array data movement
         @FuncOp.from_py_func(memRef_ty_vec, memRef_ty_vec, memRef_ty_vec)
         def sequence(input, root, output):
-            """
             if trace_size > 0:
                 trace_utils.configure_simple_tracing_aie2(
-                    ComputeTiles[0][0],
+                    ComputeTiles[0][2],
                     ShimTiles[0],
                     ddr_id=2,
                     size=trace_size,
-                    offset=N_in_bytes,
+                    offset=N_in_bytes//n_column,
                 )
-            """
             
             for c in range(n_column):
                 size = N // n_column
@@ -252,7 +248,7 @@ def ntt():
                 npu_dma_memcpy_nd(metadata=of_inroots_name[c], bd_id=2*n_column+c, mem=root, sizes=[1, 1, 1, N])
             npu_sync(column=0, row=0, direction=0, channel=0)
 
-trace_size = 2 ** 15
+trace_size = 0 if (len(sys.argv) < 2) else int(sys.argv[1])
 with mlir_mod_ctx() as ctx:
-    ntt()
+    ntt(trace_size)
     print(ctx.module)

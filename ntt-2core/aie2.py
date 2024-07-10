@@ -14,9 +14,7 @@ from aie.dialects.aiex import *
 from aie.dialects.scf import *
 from aie.extras.context import mlir_mod_ctx
 from aie.extras.dialects.ext import memref, arith
-
 import aie.utils.trace as trace_utils
-
 
 def ntt():
     logN = 11
@@ -53,6 +51,16 @@ def ntt():
         ntt_1stage = external_func(
             "ntt_1stage",
             inputs=[T.i32(), T.i32(), T.i32(), T.i32(), memRef_ty_core_half, memRef_ty_core_half, memRef_ty_core_half, memRef_ty_core_half, memRef_ty_vec, T.i32(), T.i32(), T.i32()],
+        )
+
+        trace_event0 = external_func(
+            "trace_event0",
+            inputs=[],
+        )
+
+        trace_event1 = external_func(
+            "trace_event1",
+            inputs=[],
         )
 
         # Tile declarations
@@ -111,10 +119,8 @@ def ntt():
                 buffs2[c].append(Buffer(ComputeTiles[c][r], [data_percore // 2], T.i32(), buffs2_names[c][r]))
 
         # Set up a circuit-switched flow from core to shim for tracing information
-        """
         if trace_size > 0:
-            flow(ComputeTiles[0][0], WireBundle.Trace, 0, ShimTiles[0], WireBundle.DMA, 1)
-        """
+            packetflow(0, ComputeTiles[0][0], WireBundle.Trace, 0, ShimTiles[0], WireBundle.DMA, 1, keep_pkt_header=True) # core trace
 
         # Set up compute tiles
         for c in range(n_column):
@@ -124,6 +130,7 @@ def ntt():
                     # Effective while(1)
                     core_idx = n_column * c + r
                     for _ in for_(sys.maxsize):
+                        call(trace_event0, [])
                         # Number of sub-vector "tile" iterations
                         elem_out = of_outs_core[c][r].acquire(ObjectFifoPort.Produce, 1)
                         elem_in = of_ins_core[c][r].acquire(ObjectFifoPort.Consume, 1)
@@ -146,12 +153,12 @@ def ntt():
                         of_ins_core[c][r].release(ObjectFifoPort.Consume, 1)
                         of_inroots_core[c].release(ObjectFifoPort.Consume, 1)
                         of_outs_core[c][r].release(ObjectFifoPort.Produce, 1)
+                        call(trace_event1, [])
                         yield_([])
 
         # To/from AIE-array data movement
         @FuncOp.from_py_func(memRef_ty_vec, memRef_ty_vec, memRef_ty_vec)
         def sequence(input, root, output):
-            """
             if trace_size > 0:
                 trace_utils.configure_simple_tracing_aie2(
                     ComputeTiles[0][0],
@@ -160,7 +167,6 @@ def ntt():
                     size=trace_size,
                     offset=N_in_bytes,
                 )
-            """
             
             for c in range(n_column):
                 size = N // n_column
@@ -170,7 +176,7 @@ def ntt():
                 npu_dma_memcpy_nd(metadata=of_inroots_name[c], bd_id=2*n_column+c, mem=root, sizes=[1, 1, 1, N])
             npu_sync(column=0, row=0, direction=0, channel=0)
 
-trace_size = 2 ** 15
+trace_size = 0 if (len(sys.argv) < 2) else int(sys.argv[1])
 with mlir_mod_ctx() as ctx:
     ntt()
     print(ctx.module)

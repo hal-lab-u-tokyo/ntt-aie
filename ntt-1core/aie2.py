@@ -52,7 +52,8 @@ def ntt(trace_size):
 
         # Set up a circuit-switched flow from core to shim for tracing information
         if trace_size > 0:
-            flow(ComputeTile2, WireBundle.Trace, 0, ShimTile, WireBundle.DMA, 1)
+            #flow(ComputeTile2, WireBundle.Trace, 0, ShimTile, WireBundle.DMA, 1)
+            packetflow(0, ComputeTile2, WireBundle.Trace, 0, ShimTile, WireBundle.DMA, 1, keep_pkt_header=True) # core trace
  
         # Buffer
         buff2 = Buffer(ComputeTile2, [N], T.i32(), "buff2")

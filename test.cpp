@@ -48,14 +48,15 @@ int main(int argc, const char *argv[]) {
   constexpr int64_t n = 11;
   constexpr int32_t test_stage = n - 1;  
   
-  //const int block_num = 4;
-  //std::array<int, block_num> ans_order = {0, 2, 1, 3};
+  const int block_num = 4;
+  std::array<int, block_num> ans_order = {0, 2, 1, 3};
+  //std::array<int, block_num> ans_order = {0, 1, 2, 3};
   
   //const int block_num = 8;
   //std::array<int, block_num> ans_order = {0, 2, 1, 3, 4, 6, 5, 7};
   
-  const int block_num = 16;
-  std::array<int, block_num> ans_order = {0, 2, 1, 3, 8, 10, 9, 11, 4, 6, 5, 7, 12, 14, 13, 15};
+  //const int block_num = 16;
+  //std::array<int, block_num> ans_order = {0, 2, 1, 3, 8, 10, 9, 11, 4, 6, 5, 7, 12, 14, 13, 15};
   //std::array<int, block_num> ans_order = {0, 2, 1, 3, 4, 6, 5, 7, 8, 10, 9, 11, 12, 14, 13, 15};
   
   // ============================

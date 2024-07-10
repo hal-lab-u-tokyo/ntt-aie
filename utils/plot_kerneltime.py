@@ -7,7 +7,7 @@ directory_path = "/mnt/c/Technical/ntt-aie/profile/trace"
 
 data = {}
 
-for i in range(3):
+for i in range(5):
     for j in range(7, 12):
         n = 2 ** j
         fname = f"trace_{2 ** i}core_n{j}.json"
@@ -33,27 +33,29 @@ for i in range(3):
 
             # Raw execution time
             clock = []
+            print(event0)
+            print(event1)
             for k in range(len(event1) - 1):
-                clock.append(event1[k + 1] - event1[k])
+                clock.append(event1[k+1] - event1[k])
             clock_average = sum(clock) / len(clock)
-            # exectime = clock_average / (1.25 * 10 ** 9) # s 
-            exectime = clock_average / 1.25 # ns 
+            exectime = clock_average / (1.25 * 1000) # us 
+            print(f"\texectime    :{exectime} us")
+
+            if i not in data:
+                data[i] = {}
+            data[i][n] = exectime
 
             # Cal Utilization
+            """
             flops_ntt = 8 * j * (2 ** j)
             flops_real = flops_ntt / exectime ## GFLOPS
             flops_peak = (2 ** i) * 40        ## GFLOPS
             utilization = flops_real / flops_peak
-            print(f"\texectime    :{exectime} ns")
             print(f"\tNTT FLOPS   :{flops_ntt} FLOPS")
             print(f"\tReal FLOPS  :{flops_real} GFLOPS")
             print(f"\tPeak FLOPS  :{flops_peak} GFLOPS")
             print(f"\tutilization :{utilization}")
-
-        
-            if i not in data:
-                data[i] = {}
-            data[i][n] = utilization
+            """
 
         """
         # Average of values filtering max and min

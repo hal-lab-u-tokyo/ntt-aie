@@ -14,7 +14,7 @@ include ${srcdir}/../makefile-common
 all: build/final.xclbin build/insts.txt
 
 targetname = vectorScalar
-trace_size = 16384
+trace_size = 32768
 
 build/aie.mlir: ${srcdir}/aie2.py
 	mkdir -p ${@D}
@@ -65,7 +65,7 @@ trace-win:
 
 trace-export:
 	mkdir -p trace
-	${srcdir}/../utils/parse_trace.py --filename buildMSVS/trace.txt --mlir build/aie_trace.mlir --colshift 1 > ../profile/trace/trace_1core_n${LOGN}.json
+	${srcdir}/../utils/parse_trace.py --filename buildMSVS/trace.txt --mlir build/aie_trace.mlir --colshift 1 > ../profile/trace/trace_2core_n${LOGN}.json
 
 run_py: build/final.xclbin build/insts.txt
 	${powershell} python3 ${srcdir}/test.py -x build/final.xclbin -i build/insts.txt -k MLIR_AIE

@@ -122,6 +122,14 @@ void ntt_stage_parallel8(int32_t *pOut_i0,
 
 extern "C" {
 
+void trace_event0() {
+  event0();
+}
+
+void trace_event1(){
+  event1();
+}
+
 void swap_buff(int32_t *a, int32_t *b, int32_t N) {
   const int F = N / vec_prime;
   for (int i = 0; i < F; i++){
@@ -139,7 +147,6 @@ void swap_buff(int32_t *a, int32_t *b, int32_t N) {
 void ntt_1stage(int32_t idx_stage, int32_t N, int32_t core_idx, int32_t n_core, int32_t *out0, int32_t *out1, int32_t *in0, int32_t *in1, int32_t *in_root, int32_t p, int32_t w, int32_t u) {
   // Stage N - 1 - idx_stage
   // idx_stage : 0, 1, 2, ...
-  event0();
   const int N_half = N / 2;
   const int F = N_half / vec_prime;
   const int root_base = 1 << idx_stage;
@@ -157,7 +164,6 @@ void ntt_1stage(int32_t idx_stage, int32_t N, int32_t core_idx, int32_t n_core, 
     int32_t *__restrict pOut1_i = out1 + idx_base;
     ntt_stage_parallel8(pOut0_i, pOut1_i, pIn0_i, pIn1_i, p_vector, root_vector, u_vector, p, w);
   }
-  event1();
 }
 
 void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *root_in, int32_t *c_out0, int32_t *c_out1, int32_t N, int32_t logN, int32_t N_all, int32_t core_idx, int32_t p, int32_t w, int32_t u) {
@@ -174,9 +180,6 @@ void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *root_in, int32_t *c_out0, int
   aie::vector<int32_t, 4> zero_vector4 = aie::zeros<int32_t, 4>();
 
   // Stage 0
-  event0();
-  event1();
-  event0();
   for (int i = 0; i < N / vec_prime; i++){
     int32_t *__restrict pA_i = a_in + i * vec_prime;
     aie::vector<int32_t, vec_prime> v0 = aie::load_v<vec_prime>(pA_i);
@@ -294,7 +297,6 @@ void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *root_in, int32_t *c_out0, int
     c_out0[i] = a_in[i];
     c_out1[i] = a_in[i + N / 2];
   }
-  event1();
 }
 
 void ntt_stage0_to_Nminus5_1core(int32_t *a_in, int32_t *root_in, int32_t *c_out0, int32_t *c_out1, int32_t N, int32_t logN, int32_t p, int32_t w, int32_t u) {
