@@ -19,7 +19,7 @@ import aie.utils.trace as trace_utils
 
 
 def ntt():
-    logN = 7
+    logN = 10
     N = 1 << logN
     N_in_bytes = N * 4
     p = 3329
