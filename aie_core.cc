@@ -287,21 +287,13 @@ void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *root_in, int32_t *c_out0, int
       int32_t *__restrict pA_i = a_in + idx_base;
       int32_t root = root_in[root_idx + core_idx * N_half / bf_width + i / cycle];
       aie::vector<int32_t, vec_prime> root_vector = aie::broadcast<int32_t, vec_prime>(root);
-      if (stage == logN - 1){
-        int32_t *__restrict pC_i0 = c_out0 + idx_base;
-        int32_t *__restrict pC_i1 = c_out1 + idx_base;
-        ntt_stage_parallel8(pC_i0, pC_i1, pA_i, pA_i + bf_width, p_vector, root_vector, u_vector, p, w);     
-      }else {
-        ntt_stage_parallel8(pA_i, pA_i + bf_width, pA_i, pA_i + bf_width, p_vector, root_vector, u_vector, p, w);     
-      }
+      ntt_stage_parallel8(pA_i, pA_i + bf_width, pA_i, pA_i + bf_width, p_vector, root_vector, u_vector, p, w);     
     }
   }
-  /*
   for (int i = 0; i < N / 2; i++){
     c_out0[i] = a_in[i];
     c_out1[i] = a_in[i + N / 2];
   }
-  */
   event1();
 }
 
