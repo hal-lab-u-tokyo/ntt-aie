@@ -299,8 +299,8 @@ void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *root_in, int32_t *c_out0, int
   }
 }
 
-void ntt_stage0_to_Nminus5_1core(int32_t *a_in, int32_t *root_in, int32_t *c_out0, int32_t *c_out1, int32_t N, int32_t logN, int32_t p, int32_t w, int32_t u) {
-  ntt_stage0_to_Nminus5(a_in, root_in, c_out0, c_out0 + N/2, N, logN, N, 0, p, w, u);
+void ntt_stage0_to_Nminus5_1core(int32_t N, int32_t logN, int32_t *c_out0, int32_t *a_in, int32_t p, int32_t w, int32_t u) {
+  ntt_stage0_to_Nminus5(a_in, a_in + N, c_out0, c_out0 + N/2, N, logN, N, 0, p, w, u);
 }
 
 } // extern "C"

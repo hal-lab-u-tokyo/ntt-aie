@@ -31,13 +31,14 @@ def ntt(trace_size):
     @device(AIEDevice.npu1_1col)
     def device_body():
         memRef_vec = T.memref(N, T.i32())
+        memRef_vec_twice = T.memref(N * 2, T.i32())
         memRef_scalar = T.memref(1, T.i32())
 
         # AIE Core Function declarations
-        # void ntt_stage0_to_Nminus5(int32_t *a_in, int32_t *root_in, int32_t *c_out0, int32_t *c_out1, int32_t N, int32_t logN, int32_t p, int32_t w, int32_t u) {
+        # void ntt_stage0_to_Nminus5_1core(int32_t N, int32_t logN, int32_t *c_out0, int32_t *a_in, int32_t p, int32_t w, int32_t u) {
         ntt_stage0_to_Nminus5 = external_func(
             "ntt_stage0_to_Nminus5_1core",
-            inputs=[memRef_vec, memRef_vec, memRef_vec, T.i32(), T.i32(), T.i32(), T.i32(), T.i32()],
+            inputs=[T.i32(), T.i32(), memRef_vec, memRef_vec_twice, T.i32(), T.i32(), T.i32()],
         )
 
         # Tile declarations
@@ -45,15 +46,17 @@ def ntt(trace_size):
         ComputeTile2 = tile(0, 2)
 
         # AIE-array data movement with object fifos
-        of_in = object_fifo("in", ShimTile, ComputeTile2, buffer_depth, memRef_vec)
-        of_root = object_fifo("inroot", ShimTile, ComputeTile2, buffer_depth, memRef_vec)
+        #of_in = object_fifo("in", ShimTile, ComputeTile2, buffer_depth, memRef_vec)
+        #of_root = object_fifo("inroot", ShimTile, ComputeTile2, buffer_depth, memRef_vec)
+        of_in = object_fifo("in", ShimTile, ComputeTile2, buffer_depth, memRef_vec_twice)
+
         #of_prime = object_fifo("inprime", ShimTile, ComputeTile2, buffer_depth, memRef_scalar)
         of_out = object_fifo("out", ComputeTile2, ShimTile, buffer_depth, memRef_vec)
 
         # Set up a circuit-switched flow from core to shim for tracing information
         if trace_size > 0:
-            #flow(ComputeTile2, WireBundle.Trace, 0, ShimTile, WireBundle.DMA, 1)
-            packetflow(0, ComputeTile2, WireBundle.Trace, 0, ShimTile, WireBundle.DMA, 1, keep_pkt_header=True) # core trace
+            flow(ComputeTile2, WireBundle.Trace, 0, ShimTile, WireBundle.DMA, 1)
+            #packetflow(0, ComputeTile2, WireBundle.Trace, 0, ShimTile, WireBundle.DMA, 1, keep_pkt_header=True) # core trace
  
         # Buffer
         buff2 = Buffer(ComputeTile2, [N], T.i32(), "buff2")
@@ -67,10 +70,9 @@ def ntt(trace_size):
                 # Number of sub-vector "tile" iterations
                 elem_out = of_out.acquire(ObjectFifoPort.Produce, 1)
                 elem_in = of_in.acquire(ObjectFifoPort.Consume, 1)
-                elem_root = of_root.acquire(ObjectFifoPort.Consume, 1)
-                call(ntt_stage0_to_Nminus5, [elem_in, elem_root, elem_out, N, logN, p, barrett_w, barrett_u])
+                # void ntt_stage0_to_Nminus5_1core(int32_t N, int32_t logN, int32_t *c_out0, int32_t *a_in, int32_t p, int32_t w, int32_t u) {
+                call(ntt_stage0_to_Nminus5, [N, logN, elem_out, elem_in, p, barrett_w, barrett_u])
                 of_in.release(ObjectFifoPort.Consume, 1)
-                of_root.release(ObjectFifoPort.Consume, 1)
                 of_out.release(ObjectFifoPort.Produce, 1)
                 yield_([])
 
@@ -87,7 +89,7 @@ def ntt(trace_size):
                 )
             npu_dma_memcpy_nd(metadata="out", bd_id=0, mem=C, sizes=[1, 1, 1, N])
             npu_dma_memcpy_nd(metadata="in", bd_id=1, mem=A, sizes=[1, 1, 1, N])
-            npu_dma_memcpy_nd(metadata="inroot", bd_id=2, mem=root, sizes=[1, 1, 1, N])
+            npu_dma_memcpy_nd(metadata="in", bd_id=2, mem=root, sizes=[1, 1, 1, N])
             npu_sync(column=0, row=0, direction=0, channel=0)
 
 trace_size = 0 if (len(sys.argv) < 2) else int(sys.argv[1])
