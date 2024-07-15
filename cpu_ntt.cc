@@ -6,6 +6,7 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <chrono>
 
 void bit_reversal(int64_t n, std::vector<int64_t> &res) {
     for (int i = 0; i < n; i++) {
@@ -77,7 +78,7 @@ void ntt(std::vector<int64_t> &a, int64_t n,
             j2 = j1 + t - 1;
             for (int j = j1; j <= j2; j++) {
                 int64_t root = roots_rev[h + i];
-                std::cout << j << ", " << j + t << ", root[" << h + i << "]=" << root <<std::endl;
+                //std::cout << j << ", " << j + t << ", root[" << h + i << "]=" << root <<std::endl;
                 int64_t v0 = a[j];
                 int64_t v1 = a[j + t];
                 a[j] = modadd(v0, v1, p);
@@ -160,7 +161,7 @@ void export_vector_to_file(std::vector<int64_t> &poly, int32_t q, int32_t n, int
 int main() {
     std::cout << "DFT" << std::endl;
     // Parameters
-    int32_t logn = 9;
+    int32_t logn = 12;
     int64_t n = 1 << logn;
     //int64_t p = 998244353;
     //int64_t p = 65537;
@@ -210,12 +211,18 @@ int main() {
 */
 
     std::cout << "========= ntt ===========" << std::endl;
+    auto start = std::chrono::high_resolution_clock::now();
     ntt(a, n, roots, p, barrett_w, barrett_u, stage);
-    export_vector_to_file(a, p, logn, stage);
+    auto stop = std::chrono::high_resolution_clock::now();
+
+    // Time
+    float npu_time = std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count();
+    std::cout << npu_time << " us" << std::endl;
+    //export_vector_to_file(a, p, logn, stage);
 
     //std::cout << "========= intt ============" << std::endl;
-    intt(a, n, invroots, p, n_inv);
+    //intt(a, n, invroots, p, n_inv);
     //debug_vector(a);
 
-    is_equal_polynomial(input, a);
+    //is_equal_polynomial(input, a);
 }
