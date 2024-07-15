@@ -38,7 +38,7 @@ build/final_trace.xclbin: build/aie_trace.mlir build/ntt_core.o
 	cd ${@D} && aiecc.py --aie-generate-cdo --no-compile-host --xclbin-name=${@F} \
 				--aie-generate-npu --npu-insts-name=insts.txt $(<:%=../%)
 
-${targetname}.exe: ${srcdir}/test.cpp
+${targetname}.exe: ${srcdir}/../test.cpp
 	rm -rf _build
 	mkdir -p _build
 	cd _build && ${powershell} cmake ${srcdir} -DTARGET_NAME=${targetname}
@@ -65,7 +65,7 @@ trace-win:
 
 trace-export:
 	mkdir -p trace
-	${srcdir}/../utils/parse_trace.py --filename buildMSVS/trace.txt --mlir build/aie_trace.mlir --colshift 1 > ../profile/trace/trace_1core_n${LOGN}.json
+	${srcdir}/../utils/parse_trace.py --filename buildMSVS/trace.txt --mlir build/aie_trace.mlir --colshift 1 > ../profile/trace/trace_16core_n${LOGN}.json
 
 run_py: build/final.xclbin build/insts.txt
 	${powershell} python3 ${srcdir}/test.py -x build/final.xclbin -i build/insts.txt -k MLIR_AIE

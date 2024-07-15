@@ -45,18 +45,18 @@ int main(int argc, const char *argv[]) {
   // ============================
   // Test Parameters
   // ============================
-  constexpr int64_t n = 11;
+  constexpr int64_t n = 7;
   constexpr int32_t test_stage = n - 1;  
   
-  const int block_num = 4;
-  std::array<int, block_num> ans_order = {0, 2, 1, 3};
+  //const int block_num = 4;
+  //std::array<int, block_num> ans_order = {0, 2, 1, 3};
   //std::array<int, block_num> ans_order = {0, 1, 2, 3};
   
   //const int block_num = 8;
   //std::array<int, block_num> ans_order = {0, 2, 1, 3, 4, 6, 5, 7};
   
-  //const int block_num = 16;
-  //std::array<int, block_num> ans_order = {0, 2, 1, 3, 8, 10, 9, 11, 4, 6, 5, 7, 12, 14, 13, 15};
+  const int block_num = 16;
+  std::array<int, block_num> ans_order = {0, 2, 1, 3, 8, 10, 9, 11, 4, 6, 5, 7, 12, 14, 13, 15};
   //std::array<int, block_num> ans_order = {0, 2, 1, 3, 4, 6, 5, 7, 8, 10, 9, 11, 12, 14, 13, 15};
   
   // ============================
@@ -207,7 +207,7 @@ int main(int argc, const char *argv[]) {
     int32_t ref = answers[i];
     int32_t test = bufOut[i];
     if (test != ref) {
-      std::cout << "[" << i << "] Error " << test << " != " << ref << std::endl;
+      //std::cout << "[" << i << "] Error " << test << " != " << ref << std::endl;
       errors++;
     } else {
       //std::cout << "[" << i << "] Correct " << test << " == " << ref << std::endl;

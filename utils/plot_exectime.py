@@ -1,6 +1,7 @@
 import os
 import pandas as pd
 import matplotlib.pyplot as plt
+import math
 
 directory_path = "/mnt/c/Technical/ntt-aie/profile/exectime"
 
@@ -39,7 +40,7 @@ if df.empty:
 time_empty_avg = df.mean().values[0]
 print(time_empty_avg)
 
-plt.figure(figsize=(10, 6))
+fig, ax = plt.subplots(figsize=(10, 6))
 
 print(data)
 for core, n_data in data.items():
@@ -49,8 +50,11 @@ for core, n_data in data.items():
 
 #plt.axhline(y=time_empty_avg, color='darkred', linestyle='--')
 
-plt.xticks(n_values)
+def format_func(value, tick_number):
+    return f'$2^{{{int(math.log2(value))}}}$'
 
+plt.xticks(n_values)
+ax.xaxis.set_major_formatter(plt.FuncFormatter(format_func))
 plt.xlabel('Data size', fontsize=20)
 plt.ylabel('Execution Time (us)', fontsize=20)
 plt.tick_params(labelsize=16)

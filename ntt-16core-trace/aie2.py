@@ -19,7 +19,7 @@ import aie.utils.trace as trace_utils
 
 
 def ntt():
-    logN = 9
+    logN = 7
     N = 1 << logN
     N_in_bytes = N * 4
     p = 3329
@@ -61,6 +61,16 @@ def ntt():
             inputs=[memRef_ty_core_half, memRef_ty_core_half, T.i32()],
         )
 
+        trace_event0 = external_func(
+            "trace_event0",
+            inputs=[],
+        )
+
+        trace_event1 = external_func(
+            "trace_event1",
+            inputs=[],
+        )
+
         # Tile declarations
         ShimTiles = []
         MemTiles = []
@@ -97,14 +107,9 @@ def ntt():
 
         # Output Array
         of_outs = []
-        of_outs_core = [[] for c in range(n_column)]
         of_outs_names = [f"out{c}" for c in range(n_column)]
-        of_outs_core_names = [[f"out{c}_{r}" for r in range(n_row)] for c in range(n_column)]
         for c in range(n_column):
-            of_outs.append(object_fifo(of_outs_names[c], MemTiles[c], ShimTiles[c], buffer_depth, memRef_ty_column))
-            for r in range(n_row):
-                of_outs_core[c].append(object_fifo(of_outs_core_names[c][r], ComputeTiles[c][r], MemTiles[c], buffer_depth, memRef_ty_core))
-            object_fifo_link(of_outs_core[c], of_outs[c])
+            of_outs.append(object_fifo(of_outs_names[c], ComputeTiles[c][0], ShimTiles[c], buffer_depth, memRef_ty_column))
 
         # Buffer
         buffs_a0 = [[] for c in range(n_column)]
@@ -157,8 +162,9 @@ def ntt():
                     # Effective while(1)
                     core_idx = n_row * c + r
                     for _ in for_(sys.maxsize):
+                        call(trace_event0, [])
+                        
                         # Number of sub-vector "tile" iterations
-                        elem_out = of_outs_core[c][r].acquire(ObjectFifoPort.Produce, 1)
                         elem_in = of_ins_core[c][r].acquire(ObjectFifoPort.Consume, 1)
                         elem_root = of_inroots_core[c].acquire(ObjectFifoPort.Consume, 1)
 
@@ -301,12 +307,13 @@ def ntt():
                         elif c == 2:
                             of_lock_left_additional2[r].acquire(ObjectFifoPort.Consume, 1) 
                         
-                        for i in for_(data_percore // 2):
-                            v0 = memref.load(buffs_a0[c][r], [i])
-                            v1 = memref.load(buffs_a1[c][r], [i])
-                            memref.store(v0, elem_out, [i])
-                            memref.store(v1, elem_out, [i + data_percore // 2])
-                            yield_([])
+                        if r == 0:
+                            elem_out = of_outs[c].acquire(ObjectFifoPort.Produce, 1)
+                            for i in for_(data_percolumn):
+                                v0 = arith.constant(c, T.i32())
+                                memref.store(v0, elem_out, [i])
+                                yield_([])
+                            of_outs[c].release(ObjectFifoPort.Produce, 1)
                         
                         if c  == 0:
                             of_lock_left[r][0].release(ObjectFifoPort.Consume, 1)                  
@@ -315,7 +322,7 @@ def ntt():
 
                         of_ins_core[c][r].release(ObjectFifoPort.Consume, 1)
                         of_inroots_core[c].release(ObjectFifoPort.Consume, 1)
-                        of_outs_core[c][r].release(ObjectFifoPort.Produce, 1)
+                        call(trace_event1, [])
                         yield_([])
 
         # To/from AIE-array data movement
