@@ -72,7 +72,11 @@ def plot_16core_kerneltime():
             #print(f"\texectime    :{exectime} us")
 
             kerneltime[n] = exectime
-    print(kerneltime)
+    
+    # Debug
+    for key, value in kerneltime.items():
+        print(key, ",", value)
+
     plt.plot(kerneltime.keys(), kerneltime.values(), marker='o', label="16Tile Kernel Only", color='purple')
 
 
