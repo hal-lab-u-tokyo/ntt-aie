@@ -199,6 +199,14 @@ int main(int argc, const char *argv[]) {
       answers[base_i + j] = answers_input[i * block_size + j];
     }
   }
+  /*
+  // Swap answers[0...63] <-> answers[64...127]
+  for (int i = 0; i < 64; i++){
+    int32_t tmp = answers[i];
+    answers[i] = answers[64 + i];
+    answers[64 + i] = tmp;
+  }
+  */
   
   int errors = 0;
   std::cout << "Verifying results with " << filename << std::endl;
@@ -207,7 +215,7 @@ int main(int argc, const char *argv[]) {
     int32_t ref = answers[i];
     int32_t test = bufOut[i];
     if (test != ref) {
-      //std::cout << "[" << i << "] Error " << test << " != " << ref << std::endl;
+      std::cout << "[" << i << "] Error " << test << " != " << ref << std::endl;
       errors++;
     } else {
       //std::cout << "[" << i << "] Correct " << test << " == " << ref << std::endl;

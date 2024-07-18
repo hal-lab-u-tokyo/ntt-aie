@@ -58,8 +58,8 @@ def format_func(value, tick_number):
 
 fig, ax = plt.subplots(figsize=(10, 6))
 
-plt.plot(x_gpu, y_gpu, marker='o', color='r', label='NVIDIA A100')
-plt.plot(x_aie, y_aie, marker='o', color='b', label='Ryzen AI Engine')
+plt.plot(x_gpu, y_gpu, marker='o', color='tab:blue', label='NVIDIA A100')
+plt.plot(x_aie, y_aie, marker='o', color='tab:green', label='Ryzen AI Engine')
 plt.xlabel('Data size', fontsize=20)
 ax.xaxis.set_major_formatter(plt.FuncFormatter(format_func))
 plt.xticks([2 ** i for i in [8, 15, 16, 17]], fontsize=14)
