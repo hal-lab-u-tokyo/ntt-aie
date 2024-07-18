@@ -45,7 +45,7 @@ int main(int argc, const char *argv[]) {
   // ============================
   // Test Parameters
   // ============================
-  constexpr int64_t n = 12;
+  constexpr int64_t n = 8;
   constexpr int32_t test_stage = n - 1;  
   
   //const int block_num = 4;

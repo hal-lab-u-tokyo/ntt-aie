@@ -63,6 +63,7 @@ plt.plot(x_aie, y_aie, marker='o', color='tab:green', label='Ryzen AI Engine')
 plt.xlabel('Data size', fontsize=20)
 ax.xaxis.set_major_formatter(plt.FuncFormatter(format_func))
 plt.xticks([2 ** i for i in [8, 15, 16, 17]], fontsize=14)
+#plt.xscale('log')
 plt.yticks(fontsize=18)
 plt.ylabel('Efficiency', fontsize=20)
 

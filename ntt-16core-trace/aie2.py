@@ -19,7 +19,7 @@ import aie.utils.trace as trace_utils
 
 
 def ntt(trace_size):
-    logN = 12
+    logN = 9
     N = 1 << logN
     N_in_bytes = N * 4
     p = 3329
@@ -174,10 +174,13 @@ def ntt(trace_size):
                         # Number of sub-vector "tile" iterations
                         elem_in = of_ins_core[c][r].acquire(ObjectFifoPort.Consume, 1)
                         elem_root = of_inroots_core[c].acquire(ObjectFifoPort.Consume, 1)
+                        call(trace_event1, [])
+                        call(trace_event0, [])
 
                         # ============================
                         #    NTT Stage 0 to n-5
                         # ============================
+                        
                         call(ntt_stage0_to_Nminus5, [elem_in, elem_root, buffs_a0[c][r], buffs_a1[c][r], data_percore, data_percore_log2, N, core_idx, p, barrett_w, barrett_u])
 
                         # ============================
