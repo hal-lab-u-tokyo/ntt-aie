@@ -45,7 +45,7 @@ int main(int argc, const char *argv[]) {
   // ============================
   // Test Parameters
   // ============================
-  constexpr int64_t n = 11;
+  constexpr int64_t n = 12;
   constexpr int32_t test_stage = n - 1;  
   
   //const int block_num = 4;
@@ -215,7 +215,7 @@ int main(int argc, const char *argv[]) {
     int32_t ref = answers[i];
     int32_t test = bufOut[i];
     if (test != ref) {
-      std::cout << "[" << i << "] Error " << test << " != " << ref << std::endl;
+      //std::cout << "[" << i << "] Error " << test << " != " << ref << std::endl;
       errors++;
     } else {
       //std::cout << "[" << i << "] Correct " << test << " == " << ref << std::endl;

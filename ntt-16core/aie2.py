@@ -18,7 +18,7 @@ from aie.extras.dialects.ext import memref, arith
 import aie.utils.trace as trace_utils
 
 
-def ntt():
+def ntt(trace_size):
     logN = 11
     N = 1 << logN
     N_in_bytes = N * 4
@@ -65,6 +65,16 @@ def ntt():
         write_back = external_func(
             "write_back",
             inputs=[memRef_ty_core, memRef_ty_core_half, memRef_ty_core_half, T.i32()],
+        )
+
+        trace_event0 = external_func(
+            "trace_event0",
+            inputs=[],
+        )
+
+        trace_event1 = external_func(
+            "trace_event1",
+            inputs=[],
         )
 
         # Tile declarations
@@ -163,6 +173,8 @@ def ntt():
                     # Effective while(1)
                     core_idx = n_row * c + r
                     for _ in for_(sys.maxsize):
+                        call(trace_event0, [])
+
                         # Number of sub-vector "tile" iterations
                         elem_out = of_outs_core[c][r].acquire(ObjectFifoPort.Produce, 1)
                         elem_in = of_ins_core[c][r].acquire(ObjectFifoPort.Consume, 1)
@@ -299,14 +311,6 @@ def ntt():
                         elif c == 2:
                             of_lock_left_additional2[r].acquire(ObjectFifoPort.Consume, 1) 
                         
-                        """
-                        for i in for_(data_percore // 2):
-                            v0 = memref.load(buffs_a0[c][r], [i])
-                            v1 = memref.load(buffs_a1[c][r], [i])
-                            memref.store(v0, elem_out, [i])
-                            memref.store(v1, elem_out, [i + data_percore // 2])
-                            yield_([])
-                        """
                         call(write_back, [elem_out, buffs_a0[c][r], buffs_a1[c][r], data_percore // 2])
                         
                         if c  == 0:
@@ -317,6 +321,7 @@ def ntt():
                         of_ins_core[c][r].release(ObjectFifoPort.Consume, 1)
                         of_inroots_core[c].release(ObjectFifoPort.Consume, 1)
                         of_outs_core[c][r].release(ObjectFifoPort.Produce, 1)
+                        call(trace_event1, [])
                         yield_([])
 
         # To/from AIE-array data movement
@@ -341,5 +346,5 @@ def ntt():
 
 trace_size = 0 if (len(sys.argv) < 2) else int(sys.argv[1])
 with mlir_mod_ctx() as ctx:
-    ntt()
+    ntt(trace_size)
     print(ctx.module)
