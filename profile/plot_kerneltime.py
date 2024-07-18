@@ -72,8 +72,12 @@ def plot_16core_kerneltime():
             #print(f"\texectime    :{exectime} us")
 
             kerneltime[n] = exectime
-    print(kerneltime)
-    plt.plot(kerneltime.keys(), kerneltime.values(), marker='o', label="16core Kernel Only", color='purple')
+    
+    # Debug
+    for key, value in kerneltime.items():
+        print(key, ",", value)
+
+    plt.plot(kerneltime.keys(), kerneltime.values(), marker='o', label="16Tile Kernel Only", color='purple')
 
 
 fig, ax = plt.subplots(figsize=(10, 6))
@@ -86,8 +90,8 @@ def format_func(value, tick_number):
 plt.xticks([2 ** i for i in range(7, 13)])
 ax.xaxis.set_major_formatter(plt.FuncFormatter(format_func))
 plt.xlabel('Data size', fontsize=20)
-plt.ylabel('Execution Time (us)', fontsize=20)
+plt.ylabel('Execution Kernel Time (us)', fontsize=20)
 plt.tick_params(labelsize=16)
 plt.legend(fontsize=20)
 plt.grid(True)
-plt.savefig("/mnt/c/Technical/ntt-aie/profile/exectime_with_kerneltime.png", dpi=500)
+plt.savefig("/mnt/c/Technical/ntt-aie/profile/kerneltime.png", dpi=500)
