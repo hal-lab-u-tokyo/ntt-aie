@@ -45,7 +45,7 @@ int main(int argc, const char *argv[]) {
   // ============================
   // Test Parameters
   // ============================
-  constexpr int64_t n = 11;
+  constexpr int64_t n = 8;
   constexpr int32_t test_stage = n - 1;  
   
   //const int block_num = 4;
@@ -199,6 +199,14 @@ int main(int argc, const char *argv[]) {
       answers[base_i + j] = answers_input[i * block_size + j];
     }
   }
+  /*
+  // Swap answers[0...63] <-> answers[64...127]
+  for (int i = 0; i < 64; i++){
+    int32_t tmp = answers[i];
+    answers[i] = answers[64 + i];
+    answers[64 + i] = tmp;
+  }
+  */
   
   int errors = 0;
   std::cout << "Verifying results with " << filename << std::endl;

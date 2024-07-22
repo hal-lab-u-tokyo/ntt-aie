@@ -18,7 +18,7 @@ from aie.extras.dialects.ext import memref, arith
 import aie.utils.trace as trace_utils
 
 
-def ntt():
+def ntt(trace_size):
     logN = 11
     N = 1 << logN
     N_in_bytes = N * 4
@@ -59,6 +59,22 @@ def ntt():
         swap_buff = external_func(
             "swap_buff",
             inputs=[memRef_ty_core_half, memRef_ty_core_half, T.i32()],
+        )
+        
+        # void write_back(int32_t *to, int32_t *a, int32_t *b, int32_t N_ab) {
+        write_back = external_func(
+            "write_back",
+            inputs=[memRef_ty_core, memRef_ty_core_half, memRef_ty_core_half, T.i32()],
+        )
+
+        trace_event0 = external_func(
+            "trace_event0",
+            inputs=[],
+        )
+
+        trace_event1 = external_func(
+            "trace_event1",
+            inputs=[],
         )
 
         # Tile declarations
@@ -157,6 +173,8 @@ def ntt():
                     # Effective while(1)
                     core_idx = n_row * c + r
                     for _ in for_(sys.maxsize):
+                        call(trace_event0, [])
+
                         # Number of sub-vector "tile" iterations
                         elem_out = of_outs_core[c][r].acquire(ObjectFifoPort.Produce, 1)
                         elem_in = of_ins_core[c][r].acquire(ObjectFifoPort.Consume, 1)
@@ -199,7 +217,7 @@ def ntt():
                             of_lock_up[c][2].release(ObjectFifoPort.Produce, 1)
                         else:
                             # Dummy
-                            for i in for_(data_percore // 2):
+                            for i in for_(16):
                                 v0 = memref.load(buffs_a0[c][r], [i])
                                 memref.store(v0, buffs_a0[c][r], [i])
                                 yield_([]) 
@@ -236,7 +254,7 @@ def ntt():
                             of_lock_left[r][2].release(ObjectFifoPort.Produce, 1)                  
                         else:
                             # dummy
-                            for i in for_(data_percore // 2):
+                            for i in for_(16):
                                 v0 = memref.load(buffs_a0[c][r], [i])
                                 memref.store(v0, buffs_a0[c][r], [i])
                                 yield_([])   
@@ -248,22 +266,14 @@ def ntt():
                             of_lock_left[r][1].acquire(ObjectFifoPort.Produce, 1)
                             of_lock_left[r][2].acquire(ObjectFifoPort.Consume, 1)                  
                             of_lock_left_additional[r].acquire(ObjectFifoPort.Produce, 1)                  
-                            for i in for_(data_percore // 2):
-                                v0_c1 = memref.load(buffs_a0[1][r], [i])
-                                v1_c1 = memref.load(buffs_a1[1][r], [i])
-                                v0_c2 = memref.load(buffs_a0[2][r], [i])
-                                v1_c2 = memref.load(buffs_a1[2][r], [i])
-                                memref.store(v0_c2, buffs_a0[1][r], [i])
-                                memref.store(v1_c2, buffs_a1[1][r], [i])
-                                memref.store(v0_c1, buffs_a0[2][r], [i])
-                                memref.store(v1_c1, buffs_a1[2][r], [i])
-                                yield_([]) 
+                            call(swap_buff, [buffs_a0[1][r], buffs_a0[2][r], data_percore // 2])
+                            call(swap_buff, [buffs_a1[1][r], buffs_a1[2][r], data_percore // 2])
                             of_lock_left[r][2].release(ObjectFifoPort.Consume, 1)                  
                             of_lock_left[r][1].release(ObjectFifoPort.Produce, 1)
                             of_lock_left_additional[r].release(ObjectFifoPort.Produce, 1)                  
                         else:
                             # Dummy
-                            for i in for_(data_percore // 2):
+                            for i in for_(16):
                                 v0 = memref.load(buffs_a0[c][r], [i])
                                 memref.store(v0, buffs_a0[c][r], [i])
                                 yield_([])
@@ -287,7 +297,7 @@ def ntt():
                             of_lock_left_additional2[r].release(ObjectFifoPort.Produce, 1)                  
                         else:
                             # dummy
-                            for i in for_(data_percore // 2):
+                            for i in for_(16):
                                 v0 = memref.load(buffs_a0[c][r], [i])
                                 memref.store(v0, buffs_a0[c][r], [i])
                                 yield_([])   
@@ -301,12 +311,7 @@ def ntt():
                         elif c == 2:
                             of_lock_left_additional2[r].acquire(ObjectFifoPort.Consume, 1) 
                         
-                        for i in for_(data_percore // 2):
-                            v0 = memref.load(buffs_a0[c][r], [i])
-                            v1 = memref.load(buffs_a1[c][r], [i])
-                            memref.store(v0, elem_out, [i])
-                            memref.store(v1, elem_out, [i + data_percore // 2])
-                            yield_([])
+                        call(write_back, [elem_out, buffs_a0[c][r], buffs_a1[c][r], data_percore // 2])
                         
                         if c  == 0:
                             of_lock_left[r][0].release(ObjectFifoPort.Consume, 1)                  
@@ -316,6 +321,7 @@ def ntt():
                         of_ins_core[c][r].release(ObjectFifoPort.Consume, 1)
                         of_inroots_core[c].release(ObjectFifoPort.Consume, 1)
                         of_outs_core[c][r].release(ObjectFifoPort.Produce, 1)
+                        call(trace_event1, [])
                         yield_([])
 
         # To/from AIE-array data movement
@@ -340,5 +346,5 @@ def ntt():
 
 trace_size = 0 if (len(sys.argv) < 2) else int(sys.argv[1])
 with mlir_mod_ctx() as ctx:
-    ntt()
+    ntt(trace_size)
     print(ctx.module)
