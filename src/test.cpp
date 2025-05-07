@@ -1,13 +1,3 @@
-//===- test.cpp -------------------------------------------------*- C++ -*-===//
-//
-// This file is licensed under the Apache License v2.0 with LLVM Exceptions.
-// See https://llvm.org/LICENSE.txt for license information.
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-//
-// Copyright (C) 2023, Advanced Micro Devices, Inc.
-//
-//===----------------------------------------------------------------------===//
-
 #include <cstdint>
 #include <ctime>
 #include <fstream>
@@ -76,18 +66,9 @@ int main(int argc, const char *argv[]) {
     constexpr int32_t n = 11;
     constexpr int32_t test_stage = n - 1;
 
-    // const int block_num = 4;
-    // std::array<int, block_num> ans_order = {0, 2, 1, 3};
-    // std::array<int, block_num> ans_order = {0, 1, 2, 3};
-
-    // const int block_num = 8;
-    // std::array<int, block_num> ans_order = {0, 2, 1, 3, 4, 6, 5, 7};
-
     const int block_num = 16;
     std::array<int, block_num> ans_order = {0, 2, 1, 3, 8,  10, 9,  11,
                                             4, 6, 5, 7, 12, 14, 13, 15};
-    // std::array<int, block_num> ans_order = {0, 2, 1, 3, 4, 6, 5, 7, 8, 10, 9,
-    // 11, 12, 14, 13, 15};
 
     // ============================
     // Constants
@@ -228,19 +209,7 @@ int main(int argc, const char *argv[]) {
     // ============================
     // Veryfy Results
     // ============================
-    std::string filename =
-        std::format("../ans_q{}_n{}_stage{}.txt", p, n, test_stage);
-    std::ifstream ansFile(filename);
-    if (!ansFile) {
-        std::cerr << "Error opening file: " << filename << std::endl;
-        return 1;
-    }
-    std::vector<int32_t> answers_input;
     std::vector<int32_t> answers(IN_VOLUME);
-    int ans;
-    while (ansFile >> ans) {
-        answers_input.push_back(ans);
-    }
     int block_size = IN_VOLUME / block_num;
     for (int i = 0; i < block_num; i++) {
         int base_i = ans_order[i] * block_size;
@@ -250,7 +219,7 @@ int main(int argc, const char *argv[]) {
     }
 
     int errors = 0;
-    std::cout << "Verifying results with " << filename << std::endl;
+    std::cout << "Verifying results" << std::endl;
 
     for (int32_t i = 0; i < IN_VOLUME; i++) {
         int32_t ref = answers[i];
