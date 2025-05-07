@@ -22,8 +22,8 @@ const int scaleFactor = 2;
 
 namespace po = boost::program_options;
 
-int64_t modPow(int64_t x, int64_t n, int64_t mod) {
-    int64_t ret;
+int32_t modPow(int32_t x, int32_t n, int32_t mod) {
+    int32_t ret;
     if (n == 0) {
         ret = 1;
     } else if (n % 2 == 1) {
@@ -34,17 +34,17 @@ int64_t modPow(int64_t x, int64_t n, int64_t mod) {
     return ret;
 }
 
-void make_roots(int32_t n, std::vector<int32_t> &roots, int64_t p, int64_t g) {
-    int64_t w = modPow(g, (p - 1) / n, p);
+void make_roots(int32_t n, std::vector<int32_t> &roots, int32_t p, int32_t g) {
+    int32_t w = modPow(g, (p - 1) / n, p);
     for (int i = 1; i < n; i++) {
-        roots[i] = (uint32_t) (((uint64_t) roots[i - 1] * w) % p);
+        roots[i] = (uint32_t) (((uint32_t) roots[i - 1] * w) % p);
     }
 }
 
-void ntt(std::vector<int64_t> &a, int64_t n, std::vector<int64_t> &roots_rev,
-         int64_t p, int32_t w, int32_t u, int32_t stage) {
-    int64_t t = 1;
-    int64_t j1, j2, h;
+void ntt(std::vector<int32_t> &a, int32_t n, std::vector<int32_t> &roots_rev,
+         int32_t p, int32_t stage) {
+    int32_t t = 1;
+    int32_t j1, j2, h;
     int idx = 0;
     for (int m = n; m > 1; m >>= 1) {
         j1 = 0;
@@ -52,14 +52,12 @@ void ntt(std::vector<int64_t> &a, int64_t n, std::vector<int64_t> &roots_rev,
         for (int i = 0; i < h; i++) {
             j2 = j1 + t - 1;
             for (int j = j1; j <= j2; j++) {
-                int64_t root = roots_rev[h + i];
-                // std::cout << j << ", " << j + t << ", root[" << h + i << "]="
-                // << root <<std::endl;
-                int64_t v0 = a[j];
-                int64_t v1 = a[j + t];
-                a[j] = modadd(v0, v1, p);
-                a[j + t] = barrett_2k(modsub(v0, v1, p), root, p, w, u);
-                // std::cout << "modsub = " << modsub(v0, v1, p) << std::endl;
+                int32_t root = roots_rev[h + i];
+                int32_t v0 = a[j];
+                int32_t v1 = a[j + t];
+                a[j] = (v0 + v1) % p;
+                a[j + t] =
+                    (static_cast<uint64_t>((v0 + p - v1) % p) * root) % p;
             }
             j1 += 2 * t;
         }
@@ -75,7 +73,7 @@ int main(int argc, const char *argv[]) {
     // ============================
     // Test Parameters
     // ============================
-    constexpr int64_t n = 11;
+    constexpr int32_t n = 11;
     constexpr int32_t test_stage = n - 1;
 
     // const int block_num = 4;
@@ -94,8 +92,8 @@ int main(int argc, const char *argv[]) {
     // ============================
     // Constants
     // ============================
-    constexpr int64_t p = 3329;
-    constexpr int64_t g = 3;
+    constexpr int32_t p = 3329;
+    constexpr int32_t g = 3;
     constexpr bool VERIFY = true;
     int IN_VOLUME = 1 << n;
     int OUT_VOLUME = IN_VOLUME;
@@ -219,6 +217,15 @@ int main(int argc, const char *argv[]) {
     }
 
     // ============================
+    // CPU Reference
+    // ============================
+    std::vector<int32_t> a_ref(IN_VOLUME);
+    for (int i = 0; i < IN_VOLUME; i++) {
+        a_ref[i] = i;
+    }
+    ntt(a_ref, IN_VOLUME, root, p, test_stage);
+
+    // ============================
     // Veryfy Results
     // ============================
     std::string filename =
@@ -238,7 +245,7 @@ int main(int argc, const char *argv[]) {
     for (int i = 0; i < block_num; i++) {
         int base_i = ans_order[i] * block_size;
         for (int j = 0; j < block_size; j++) {
-            answers[base_i + j] = answers_input[i * block_size + j];
+            answers[base_i + j] = a_ref[i * block_size + j];
         }
     }
 
