@@ -1,8 +1,6 @@
-# This file is licensed under the Apache License v2.0 with LLVM Exceptions.
-# See https://llvm.org/LICENSE.txt for license information.
-# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-#
-# (c) Copyright 2023 Advanced Micro Devices, Inc.
+# This file includes modifications to original code from the mlir-aie project:
+# https://github.com/Xilinx/mlir-aie
+# Licensed under the Apache License, Version 2.0.
 
 # parameters
 # -DBOOST_ROOT: Path to Boost install
