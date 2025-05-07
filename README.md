@@ -5,6 +5,11 @@ This repository contains the implementation of NTT (Number Theoretic Transform) 
 ## Get Started
 TODO
 
+## License
+This project is licensed under the Apache License 2.0.
+It includes modified source code from the [mlir-aie project](https://github.com/Xilinx/mlir-aie) by Xilinx.  
+Please refer to the [LICENSE](./LICENSE) for details.
+
 ## Reference
 ```
 @INPROCEEDINGS{nozaki-mcsoc24,
