@@ -6,10 +6,28 @@
 # 
 ##===----------------------------------------------------------------------===##
 
-srcdir := $(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
+srcdir := $(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))/src
 LOGN = 8
 
-include ${srcdir}/../makefile-common
+# VITIS related variables
+VITIS_ROOT ?= $(shell realpath $(dir $(shell which vitis))/../)
+VITIS_AIETOOLS_DIR ?= ${VITIS_ROOT}/aietools
+VITIS_AIE_INCLUDE_DIR ?= ${VITIS_ROOT}/aietools/data/versal_prod/lib
+VITIS_AIE2_INCLUDE_DIR ?= ${VITIS_ROOT}/aietools/data/aie_ml/lib
+
+CHESSCC1_FLAGS = -f -p me -P ${VITIS_AIE_INCLUDE_DIR} -I ${VITIS_AIETOOLS_DIR}/include
+CHESSCC2_FLAGS = -f -p me -P ${VITIS_AIE2_INCLUDE_DIR} -I ${VITIS_AIETOOLS_DIR}/include -D__AIENGINE__=2 -D__AIEARCH__=20
+CHESS_FLAGS = -P ${VITIS_AIE_INCLUDE_DIR}
+
+CHESSCCWRAP1_FLAGS = aie -I ${VITIS_AIETOOLS_DIR}/include 
+CHESSCCWRAP2_FLAGS = aie2 -I ${VITIS_AIETOOLS_DIR}/include 
+
+TEST_POWERSHELL := $(shell command -v powershell.exe >/dev/null 2>&1 && echo yes || echo no)
+ifeq ($(TEST_POWERSHELL),yes)
+	powershell = powershell.exe
+else
+	powershell = 
+endif
 
 all: build/final.xclbin build/insts.txt
 
@@ -24,7 +42,7 @@ build/aie_trace.mlir: ${srcdir}/aie2.py
 	mkdir -p ${@D}
 	python3 $< ${trace_size} > $@
 	
-build/ntt_core.o: ${srcdir}/../aie_core.cc
+build/ntt_core.o: ${srcdir}/aie_core.cc
 	mkdir -p ${@D}
 	cd ${@D} && xchesscc_wrapper ${CHESSCCWRAP2_FLAGS} -c $< -o ${@F}
 
@@ -38,7 +56,7 @@ build/final_trace.xclbin: build/aie_trace.mlir build/ntt_core.o
 	cd ${@D} && aiecc.py --aie-generate-cdo --no-compile-host --xclbin-name=${@F} \
 				--aie-generate-npu --npu-insts-name=insts.txt $(<:%=../%)
 
-${targetname}.exe: ${srcdir}/../test.cpp
+${targetname}.exe: ${srcdir}/test.cpp
 	rm -rf _build
 	mkdir -p _build
 	cd _build && ${powershell} cmake ${srcdir} -DTARGET_NAME=${targetname}
@@ -48,12 +66,6 @@ ifeq "${powershell}" "powershell.exe"
 else
 	cp _build/${targetname} $@ 
 endif 
-
-host: ${srcdir}/../cpu_ntt.cc
-	g++ -o host $<
-
-modmul: ${srcdir}/../cpu_modmul.cc
-	g++ -o modmul $<
 
 run: ${targetname}.exe build/final.xclbin build/insts.txt 
 	${powershell} ./$< -x build/final.xclbin -i build/insts.txt -k MLIR_AIE
