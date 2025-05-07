@@ -2,3 +2,5 @@ build/
 buildMSVS/
 _build/
 data
+*.lst
+*.txt

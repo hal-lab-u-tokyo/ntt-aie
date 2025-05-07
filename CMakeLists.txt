@@ -47,7 +47,7 @@ find_package(Boost REQUIRED)
 
 add_executable(${currentTarget}
     ${MLIR_AIE_DIR}/runtime_lib/test_lib/test_utils.cpp
-    ../test.cpp
+    ./src/test.cpp
 )
 
 target_compile_definitions(${currentTarget} PUBLIC DISABLE_ABI_CHECK=1)
